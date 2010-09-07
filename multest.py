@@ -8,7 +8,7 @@ def mul_test(data_bits, fact_bits, magn_bits, factor):
 
 	print "# effective factor: %s" % m.eff_factor()
 	for i in range(-2**(data_bits-1), 2**(data_bits-1)):
-		print "%3i\t%3i" % (i, m.mul(i))
+		print "%3i\t%3i" % (i, m.input(i))
 
 
 if __name__ == "__main__":
