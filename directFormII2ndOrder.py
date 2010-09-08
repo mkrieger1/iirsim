@@ -35,10 +35,10 @@ D = [Delay(BITS) for i in range(2)]
 M = [Multiply(BITS, MUL_BITS, MUL_BITS-2) for i in range(5)]
 [M[i].set_factor(factors[i]) for i in range(5)]
 
-A[0].connect(C, A[2])
-A[1].connect(M[0], A[3])
-A[2].connect(M[3], M[4])
-A[3].connect(M[1], M[2])
+A[0].connect([C, A[2]])
+A[1].connect([M[0], A[3]])
+A[2].connect([M[3], M[4]])
+A[3].connect([M[1], M[2]])
 
 D[0].connect(A[0])
 D[1].connect(D[0])
