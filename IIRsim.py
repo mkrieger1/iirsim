@@ -34,7 +34,7 @@ class Const():
         self.value = 0
 
     def set_value(self, value):
-        if test_overflow(value):
+        if test_overflow(value, self.bits):
             raise ValueError("input overflow")
         else:
             self.value = value
@@ -49,7 +49,12 @@ class Add():
         self.overflow = False
         self.input_nodes = [None, None]
 
+    def connect(self, input_nodes):
+        self.input_nodes = input_nodes
+
     def get_output(self):
+        if any([node is None for node in self.input_nodes]):
+            raise RuntimeError("not all inputs are connected")
         [valueA, valueB] = [node.get_output() for node in self.input_nodes]
         if (test_overflow(valueA, self.bits) or test_overflow(valueB, self.bits)):
             raise ValueError("input overflow")
@@ -77,7 +82,12 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
             self.factor = factor
             self.eff_factor_str = "%i/%i" % (factor, 2**(self.magn_bits))
 
+    def connect(self, input_node):
+        self.input_node = input_node
+
     def get_output(self):
+        if self.input_node is None:
+            raise RuntimeError("input is not connected")
         value = self.input_node.get_output()
         if test_overflow(value, self.data_bits):
             raise ValueError("input overflow")
@@ -93,13 +103,21 @@ class Delay():
         self.value = 0
         self.input_node = None
 
+    def connect(self, input_node):
+        self.input_node = input_node
+
     def get_output(self):
         return self.value
 
     def clk(self):
+        if self.input_node is None:
+            raise RuntimeError("input is not connected")
         value = self.input_node.get_output()
         if test_overflow(value, self.bits):
             raise ValueError("input overflow")
         else:
             self.value = value
+
+    def reset(self):
+        self.value = 0
 
