@@ -128,16 +128,44 @@ class Delay():
 #--------------------------------------------------------------------
 class Filter():
     def __init__(self, in_node, out_node):
+        if in_node.__class__ is not Const:
+            raise TypeError("input node must be a Const instance")
         self.in_node = in_node
         self.out_node = out_node
         self.nodes = {}
-        # build dictionary of all nodes (use node type, i.e. class name as value)
+        # build dictionary of all nodes (use order of insertion as value)
         # by depth-first-search
         node_stack = [out_node]
+        count = 0
         while len(node_stack):
             node = node_stack.pop()
             if node not in self.nodes:
-                self.nodes[node] = node.__class__.__name__
+                self.nodes[node] = count
+                count += 1
                 for input_node in node.input_nodes:
                     node_stack.append(input_node)
+        # build adjacency list using the dictionary
+        self.adjacency = [None] * len(self.nodes)
+        for [node, index] in self.nodes.items():
+            neighbor_index = \
+                [self.nodes[neighbor] for neighbor in node.input_nodes]
+            self.adjacency[index] = neighbor_index
+        # build list of Delay nodes
+        self.delay_nodes = []
+        for node in self.nodes:
+            if node.__class__ is Delay:
+                self.delay_nodes.append(node)
 
+    def filter(self, input_values):
+        for v in input_values:
+            self.in_node.set_value(v)
+            yield self.out_node.get_output()
+            for delay_node in self.delay_nodes:
+                delay_node.clk()
+        # continue after input sequence is over (--> IIR)
+        self.in_node.set_value(0)
+        while True:
+            yield self.out_node.get_output()
+            for delay_node in self.delay_nodes:
+                delay_node.clk()
+        
