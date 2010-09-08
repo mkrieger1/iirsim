@@ -25,18 +25,33 @@ complement"""
     return (value < LO) or (value > HI)
 
 
-# basic components: Add, Multiply, Delay
+# basic components: Const, Add, Multiply, Delay
 #--------------------------------------------------------------------
+class Const():
+    """constant <bits> bit number"""
+    def __init__(self, bits):
+        self.bits = bits
+        self.value = 0
+
+    def set_value(self, value):
+        if test_overflow(value):
+            raise ValueError("input overflow")
+        else:
+            self.value = value
+    
+    def get_output(self):
+        return self.value
+
 class Add():
     """<bits> x <bits> --> <bits> adder"""
     def __init__(self, bits):
         self.bits = bits
         self.overflow = False
+        self.input_nodes = [None, None]
 
-    def input(self, values):
-    [valueA, valueB] = values
-        if (test_overflow(valueA, self.bits) or
-            test_overflow(valueB, self.bits)):
+    def get_output(self):
+        [valueA, valueB] = [node.get_output() for node in self.input_nodes]
+        if (test_overflow(valueA, self.bits) or test_overflow(valueB, self.bits)):
             raise ValueError("input overflow")
         else:
             S = valueA + valueB
@@ -51,18 +66,19 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
         self.fact_bits = fact_bits
         self.magn_bits = magn_bits
         self.factor = 0
+        self.eff_factor_str = "0/%i" % 2**magn_bits
         self.overflow = False
+        self.input_node = None
 
     def set_factor(self, factor):
         if test_overflow(factor, self.fact_bits):
             raise ValueError("input overflow")
         else:
             self.factor = factor
+            self.eff_factor_str = "%i/%i" % (factor, 2**(self.magn_bits))
 
-    def eff_factor(self):
-        return "%i/%i" % (self.factor, 2**(self.magn_bits))
-
-    def input(self, value):
+    def get_output(self):
+        value = self.input_node.get_output()
         if test_overflow(value, self.data_bits):
             raise ValueError("input overflow")
         else:
@@ -75,39 +91,15 @@ class Delay():
     def __init__(self, bits):
         self.bits = bits
         self.value = 0
+        self.input_node = None
 
-    def input(self, value):
+    def get_output(self):
+        return self.value
+
+    def clk(self):
+        value = self.input_node.get_output()
         if test_overflow(value, self.bits):
             raise ValueError("input overflow")
         else:
-            temp, self.value = self.value, value
-            return temp
-
-# IIR Filter represented as graph with basic components as nodes
-#--------------------------------------------------------------------
-class FilterNode():
-    def __init__(self, component, n_inputs):
-        self.component = component
-        self.n_inputs = n_inputs
-        self.input_value = [None]*n_inputs
-        self.input_nodes = [None]*n_inputs
-        self.output_value = None
-
-    def reset(self):
-    self.input_value = [None]*n_inputs
-    self.output_value = None
-
-    def connect_inputs(self, input_nodes):
-        if not(len(input_nodes) == self.n_inputs):
-            raise ValueError("wrong number of inputs")
-        else:
-            self.input_nodes = input_nodes
-
-    def get_output(self):
-        if self.output_value is None:
-            for i in range(self.n_inputs):
-                if self.input_value[i] is None:
-                    self.input_value[i] = get_output(self.input_list[i])
-        self.output_value = self.component.input(self.input_value)
-    return self.output_value
+            self.value = value
 
