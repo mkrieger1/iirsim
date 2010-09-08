@@ -32,6 +32,7 @@ class Const():
     def __init__(self, bits):
         self.bits = bits
         self.value = 0
+        self.input_nodes = []
 
     def set_value(self, value):
         if test_overflow(value, self.bits):
@@ -73,7 +74,7 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
         self.factor = 0
         self.eff_factor_str = "0/%i" % 2**magn_bits
         self.overflow = False
-        self.input_node = None
+        self.input_nodes = [None]
 
     def set_factor(self, factor):
         if test_overflow(factor, self.fact_bits):
@@ -83,12 +84,13 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
             self.eff_factor_str = "%i/%i" % (factor, 2**(self.magn_bits))
 
     def connect(self, input_node):
-        self.input_node = input_node
+        self.input_nodes = [input_node]
 
     def get_output(self):
-        if self.input_node is None:
+        [input_node] = self.input_nodes
+        if input_node is None:
             raise RuntimeError("input is not connected")
-        value = self.input_node.get_output()
+        value = input_node.get_output()
         if test_overflow(value, self.data_bits):
             raise ValueError("input overflow")
         else:
@@ -101,18 +103,19 @@ class Delay():
     def __init__(self, bits):
         self.bits = bits
         self.value = 0
-        self.input_node = None
+        self.input_nodes = [None]
 
     def connect(self, input_node):
-        self.input_node = input_node
+        self.input_nodes = [input_node]
 
     def get_output(self):
         return self.value
 
     def clk(self):
-        if self.input_node is None:
+        [input_node] = self.input_nodes
+        if input_node is None:
             raise RuntimeError("input is not connected")
-        value = self.input_node.get_output()
+        value = input_node.get_output()
         if test_overflow(value, self.bits):
             raise ValueError("input overflow")
         else:
@@ -120,4 +123,21 @@ class Delay():
 
     def reset(self):
         self.value = 0
+
+# wrapper
+#--------------------------------------------------------------------
+class Filter():
+    def __init__(self, in_node, out_node):
+        self.in_node = in_node
+        self.out_node = out_node
+        self.nodes = {}
+        # build dictionary of all nodes (use node type, i.e. class name as value)
+        # by depth-first-search
+        node_stack = [out_node]
+        while len(node_stack):
+            node = node_stack.pop()
+            if node not in self.nodes:
+                self.nodes[node] = node.__class__.__name__
+                for input_node in node.input_nodes:
+                    node_stack.append(input_node)
 
