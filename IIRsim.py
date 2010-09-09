@@ -169,3 +169,55 @@ class Filter():
             for delay_node in self.delay_nodes:
                 delay_node.clk()
         
+# putting it all together
+#--------------------------------------------------------------------
+
+def directForm2(bits, mul_bits, factors):
+# 2nd order direct form II
+#
+#                        b0 
+# x[n] ----->(+)------+----->(+)-----> y[n]
+#             A       |       A
+#             |       V       |
+#             |     [z-1]     |
+#             |       |       |
+#             |   a1  |  b1   |
+#            (+)<-----+----->(+)
+#             A       |       A
+#             |       V       |
+#             |     [z-1]     |
+#             |       |       |
+#             |   a2  |  b2   |
+#             +-------+-------+
+#
+# y[n] = a1 y[n-1] + a2 y[n-2] + b0 x[n] + b1 x[n-1] + b2 x[n-2]
+
+    [b0, b1, b2, a1, a2] = factors
+
+    C = Const(bits)
+    A = [Add(bits) for i in range(4)]
+    D = [Delay(bits) for i in range(2)]
+    M = [Multiply(bits, mul_bits, mul_bits-2) for i in range(5)]
+    [M[i].set_factor(factors[i]) for i in range(5)]
+    # setting magn_bits of Multiply() to mul_bits-2 allows for effective
+    # multiplication by approx. -2...2
+    # e.g. mul_bits = 5 --> magn_bits = 3 --> -16/8 ... +15/8
+
+    A[0].connect([C, A[2]])
+    A[1].connect([M[0], A[3]])
+    A[2].connect([M[3], M[4]])
+    A[3].connect([M[1], M[2]])
+
+    D[0].connect(A[0])
+    D[1].connect(D[0])
+
+    M[0].connect(A[0])
+    M[1].connect(D[0])
+    M[2].connect(D[1])
+    M[3].connect(D[0])
+    M[4].connect(D[1])
+
+    F = Filter(C, A[1])
+
+    return F
+
