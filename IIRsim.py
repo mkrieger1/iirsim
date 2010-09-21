@@ -103,6 +103,7 @@ class Delay():
     def __init__(self, bits):
         self.bits = bits
         self.value = 0
+        self.next_value = 0
         self.input_nodes = [None]
 
     def connect(self, input_node):
@@ -111,7 +112,7 @@ class Delay():
     def get_output(self):
         return self.value
 
-    def clk(self):
+    def sample(self):
         [input_node] = self.input_nodes
         if input_node is None:
             raise RuntimeError("input is not connected")
@@ -119,10 +120,14 @@ class Delay():
         if test_overflow(value, self.bits):
             raise ValueError("input overflow")
         else:
-            self.value = value
+            self.next_value = value
+
+    def clk(self):
+        self.value = self.next_value
 
     def reset(self):
         self.value = 0
+        self.next_value = 0
 
 # wrapper
 #--------------------------------------------------------------------
@@ -154,6 +159,8 @@ class Filter():
         #    self.adjacency[index] = neighbor_index
 
     def clk(self):
+        for node in self.delay_nodes:
+            node.sample()
         for node in self.delay_nodes:
             node.clk()
 
