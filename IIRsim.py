@@ -132,49 +132,45 @@ class Filter():
             raise TypeError("input node must be a Const instance")
         self.in_node = in_node
         self.out_node = out_node
-        self.nodes = {}
-        # build dictionary of all nodes (use order of insertion as value)
-        # by depth-first-search
+        self.nodes = []
+        self.delay_nodes = []
+        # build list of all nodes and list of delay nodes (which need the clock
+        # signal) by depth-first-search beginning at output node
         node_stack = [out_node]
-        count = 0
         while len(node_stack):
             node = node_stack.pop()
             if node not in self.nodes:
-                self.nodes[node] = count
-                count += 1
+                self.nodes.append(node)
+                if node.__class__ is Delay:
+                    self.delay_nodes.append(node)
                 for input_node in node.input_nodes:
                     node_stack.append(input_node)
-        # build adjacency list using the dictionary
-        self.adjacency = [None] * len(self.nodes)
-        for [node, index] in self.nodes.items():
-            neighbor_index = \
-                [self.nodes[neighbor] for neighbor in node.input_nodes]
-            self.adjacency[index] = neighbor_index
-        # build list of Delay nodes
-        self.delay_nodes = []
-        for node in self.nodes:
-            if node.__class__ is Delay:
-                self.delay_nodes.append(node)
+        # build adjacency list (was: using the dictionary)
+        # TODO using the list
+        #self.adjacency = [None] * len(self.nodes)
+        #for [node, index] in self.nodes.items():
+        #    neighbor_index = \
+        #        [self.nodes[neighbor] for neighbor in node.input_nodes]
+        #    self.adjacency[index] = neighbor_index
+
+    def clk(self):
+        for node in self.delay_nodes:
+            node.clk()
 
     def reset(self):
-        for delay_node in self.delay_nodes:
-            delay_node.reset()
+        for node in self.delay_nodes:
+            node.reset()
 
-    def filter(self, input_values, N=0):
+    def filter(self, input_values):
         for v in input_values:
             self.in_node.set_value(v)
             yield self.out_node.get_output()
-            for delay_node in self.delay_nodes:
-                delay_node.clk()
+            self.clk()
         self.in_node.set_value(0)
         # continue after input sequence is over (--> IIR)
-        # until N values are yielded
-        remaining = max(len(input_values), N) - len(input_values)
-        while remaining:
+        while True:
             yield self.out_node.get_output()
-            for delay_node in self.delay_nodes:
-                delay_node.clk()
-            remaining -= 1
+            self.clk()
         
 # putting it all together
 #--------------------------------------------------------------------
@@ -231,7 +227,7 @@ class directForm2():
         F = Filter(C, A[1])
         self.filter = F.filter
 
-    def idealfilter(self, input_values, N):
+    def idealfilter(self, input_values):
         [b0, b1, b2, a1, a2] = \
             map(lambda x: float(x)/2**self.magn_bits, self.factors)
         y1 = 0 # y[n-1]
@@ -246,12 +242,9 @@ class directForm2():
             y1, y2 = y, y1
         x = 0
         # continue after input sequence is over (--> IIR)
-        # until N values are yielded
-        remaining = max(len(input_values), N) - len(input_values)
-        while remaining:
+        while True:
             y = a1*y1 + a2*y2 + b0*x + b1*x1 + b2*x2
             yield y
             x1, x2 = x, x1
             y1, y2 = y, y1
-            remaining -= 1
 
