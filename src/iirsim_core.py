@@ -1,34 +1,66 @@
-# helper functions
+"""Utility to simulate IIR filters.
+
+Contains classes that represent basic components of digital filters. Input and
+output values of these components are 'int' objects representing two's
+complement binary numbers.
+
+Classes:
+Const    -- Holds a constant value.
+Delay    -- Stores its input value when triggered.
+Add      -- Adds two values. Truncates the output if overflow occurs.
+Multiply -- Multiplies a value by a constant factor. Limits the output if
+            overflow occurs.
+
+All components ('Const', 'Add', 'Multiply' and 'Delay') have a method
+'get_output()' which returns the output value of the component.
+In the case of 'Add' and 'Multiply' this is done by calling 'get_output()' on
+the components that are defined as input by using the 'connect()' method.
+"""
+
+# representing integer values as binary numbers
 #--------------------------------------------------------------------
-def truncate(value, bits):
-    """truncate <value> to <bits> bit number in 2-s complement"""
-    v = int(value)
-    return ((v+2**(bits-1)) % 2**bits) - 2**(bits-1)
+def truncate(x, N):
+    """Truncate integer x to N bit two's complement number.
+   
+    With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
+    For -B <= x < B, x remains unchanged.
+    """
+    if type(x) is not int:
+        raise TypeError("'int' object expected")
+    B = 2**(N-1)
+    return ((x+B) % 2**N) - B
 
-def clip(value, bits):
-    """clip <value> to <bits> bit number in 2-s complement"""
-    LO = -2**(bits-1)
-    HI =  2**(bits-1)-1
-    v = int(value)
-    if v < LO:
-        return LO
-    elif v > HI:
-        return HI
+def limit(x, N):
+    """Limit integer x to N bit two's complement number.
+
+    With B = 2^(N-1) the largest absolute value,
+    B-1 is returned for x > B-1,
+    -B  is returned for x < -B,
+    for -B <= x < B, x remains unchanged.
+    """
+    if type(x) is not int:
+        raise TypeError("'int' object expected")
+    B = 2**(N-1)
+    if x < -B:
+        return -B
+    elif x > B-1:
+        return B-1
     else:
-        return v
+        return x
 
-def test_overflow(value, bits):
-    """test if <value> can be represented as <bits> bit number in 2-s
-complement"""
-    LO = -2**(bits-1)
-    HI =  2**(bits-1)-1
-    return (value < LO) or (value > HI)
+def test_overflow(x, N):
+    """Test if integer x can be represented as N bit two's complement number."""
+    if type(x) is not int:
+        raise TypeError("'int' object expected")
+    B = 2**(N-1)
+    return (x < -B) or (x > B-1)
 
 
 # basic components: Const, Add, Multiply, Delay
 #--------------------------------------------------------------------
 class Const():
-    """constant <bits> bit number"""
+    """Const(N) holds a constant N bit 2's complement number x:
+-2^(N-1) <= x < +2^(N-1)"""
     def __init__(self, bits):
         self.bits = bits
         self.value = 0
@@ -96,7 +128,7 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
         else:
             P = (value*self.factor) >> self.magn_bits
             self.overflow = test_overflow(P, self.data_bits)
-            return clip(P, self.data_bits)
+            return limit(P, self.data_bits)
 
 class Delay():
     """stores one <bits> bit number"""
