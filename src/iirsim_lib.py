@@ -1,8 +1,8 @@
 """Utility to simulate IIR filters.
 
-Contains classes that represent basic components of digital filters. Input and
-output values of these components are 'int' objects representing two's
-complement binary numbers.
+Contains classes that represent basic components of digital filters. Instances
+of these classes can be connected to form a filter. They exchange 'int'
+objects which represent two's complement binary numbers. 
 
 Classes:
 Const    -- Holds a constant value.
@@ -11,10 +11,31 @@ Add      -- Adds two values. Truncates the output if overflow occurs.
 Multiply -- Multiplies a value by a constant factor. Limits the output if
             overflow occurs.
 
-All components ('Const', 'Add', 'Multiply' and 'Delay') have a method
-'get_output()' which returns the output value of the component.
-In the case of 'Add' and 'Multiply' this is done by calling 'get_output()' on
-the components that are defined as input by using the 'connect()' method.
+Class interface:
+connect() (all except Const) -- Define input components.
+get_output() (all)           -- Return the output value of the component by
+                                either calling get_output() of the input
+                                components recursively and performing the
+                                appropriate arithmetic (Add, Multiply) or by
+                                returning the currently stored value (Const,
+                                Delay).
+sample() (Delay)             -- Call get_output() recursively on the input
+                                components and store the output as 'next
+                                value'. *
+clk() (Delay)                -- Replace currently stored value by 'next
+                                value'. *
+set_value() (Const)          -- Define currently stored value. This component
+                                is meant to be used as external input for the
+                                whole filter (i.e. to resolve the recursion).
+set_factor() (Multiply)      -- Define the factor by which the input value is
+                                multiplied when get_output() is called.
+
+                                * Note:
+                                sample() and clk() are implemented as separate
+                                functions, because the 'next value' must be
+                                saved for all Delay components before the
+                                output values are replaced, in order to
+                                simulate concurrency.
 """
 
 # representing integer values as binary numbers
