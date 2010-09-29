@@ -1,24 +1,27 @@
 """Utility to simulate IIR filters.
 
 Contains classes that represent basic components of digital filters. Instances
-of these classes can be connected to form a filter. They exchange 'int'
-objects which represent two's complement binary numbers. 
+of these classes can be connected to each other, acting as nodes in a graph
+structure, to form a filter. Input and output values are integers representing
+two's complement binary numbers.
 
-Classes:
-Const    -- Holds a constant value.
-Delay    -- Stores its input value when triggered.
-Add      -- Adds two values. Truncates the output if overflow occurs.
-Multiply -- Multiplies a value by a constant factor. Limits the output if
-            overflow occurs.
+Classes (overview):
+Const    -- Output is a constant value.
+Delay    -- Output is the previously stored input value.
+Add      -- Output is the sum of two input values.
+Multiply -- Output is the input value multiplied by a constant factor.
 
-Class interface:
-connect() (all except Const) -- Define input components.
-get_output() (all)           -- Return the output value of the component by
-                                either calling get_output() of the input
-                                components recursively and performing the
-                                appropriate arithmetic (Add, Multiply) or by
-                                returning the currently stored value (Const,
-                                Delay).
+Common class methods:
+connect() (all except Const) -- Set the input node(s).
+get_output() (all)           -- Return the output value by either calling
+                                get_output() of the input node(s) recursively
+                                and performing the appropriate arithmetic
+                                (Add, Multiply) or by returning the currently
+                                stored value (Const, Delay).
+set_bits() (all)             -- Set the number of bits used for the input and
+                                output values..
+
+#------------ runter ------------------------------
 sample() (Delay)             -- Call get_output() recursively on the input
                                 components and store the output as 'next
                                 value'. *
@@ -36,22 +39,23 @@ set_factor() (Multiply)      -- Define the factor by which the input value is
                                 saved for all Delay components before the
                                 output values are replaced, in order to
                                 simulate concurrency.
+#------------ runter ------------------------------
 """
 
-# representing integer values as binary numbers
+# internally used functions
 #--------------------------------------------------------------------
-def truncate(x, N):
+def _truncate(x, N):
     """Truncate integer x to N bit two's complement number.
    
     With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
     For -B <= x < B, x remains unchanged.
     """
-    if type(x) is not int:
-        raise TypeError("'int' object expected")
+    if isinstance(x, int):
+        raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return ((x+B) % 2**N) - B
 
-def limit(x, N):
+def _limit(x, N):
     """Limit integer x to N bit two's complement number.
 
     With B = 2^(N-1) the largest absolute value,
@@ -59,8 +63,8 @@ def limit(x, N):
     -B  is returned for x < -B,
     for -B <= x < B, x remains unchanged.
     """
-    if type(x) is not int:
-        raise TypeError("'int' object expected")
+    if isinstance(x, int):
+        raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     if x < -B:
         return -B
@@ -69,37 +73,72 @@ def limit(x, N):
     else:
         return x
 
-def test_overflow(x, N):
+def _test_overflow(x, N):
     """Test if integer x can be represented as N bit two's complement number."""
-    if type(x) is not int:
-        raise TypeError("'int' object expected")
+    if isinstance(x, int):
+        raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return (x < -B) or (x > B-1)
 
-
-# basic components: Const, Add, Multiply, Delay
+# base class: _FilterComponent
 #--------------------------------------------------------------------
-class Const():
-    """Const(N) holds a constant N bit 2's complement number x:
--2^(N-1) <= x < +2^(N-1)"""
-    def __init__(self, bits):
-        self.bits = bits
-        self.value = 0
-        self.input_nodes = []
+class _FilterComponent():
+    def __init__(self, ninputs, bits):
+        if isinstance(ninputs, int):
+            raise TypeError("number of inputs must be 'int'")
+        elif ninputs < 0:
+            raise ValueError("number of inputs must not be negative")
+        elif isinstance(bits, int):
+            raise TypeError("number of bits must be 'int'")
+        elif bits < 1:
+            raise ValueError("number of bits must be positive")
+        else:
+            self._input_nodes = [None for i in range(ninputs)]
+            self._bits = bits
+
+    def connect(self, input_nodes):
+        
+    def get_output(self):
+        raise NotImplementedError
+
+# Const, Add, Multiply, Delay are inherited from the _FilterComponent base class
+#--------------------------------------------------------------------
+class Const(_FilterComponent):
+    """Stores a constant integer value that must be set explicitly."""
+
+    def __init__(self, bits, value=0):
+        """Set the number of bits and the initial value."""
+        try:
+            _FilterComponent.__init__(self, 0, bits)
+        except (TypeError, ValueError):
+            raise
+        self.set_value(value)
 
     def set_value(self, value):
-        if test_overflow(value, self.bits):
-            raise ValueError("input overflow")
-        else:
-            self.value = value
+        """Set the stored value.
+
+        For N the number of bits, valid inputs are integer numbers x where
+        -B <= x < B, with B = 2^(N-1) the largest absolute value.
+        """
+        try:
+            input_overflow = _test_overflow(value, self._bits)
+            if input_overflow:
+                raise ValueError("input overflow")
+            else:
+                self.value = value
+        except TypeError:
+            raise
     
     def get_output(self):
+        """Return the stored value."""
         return self.value
 
 class Add():
-    """<bits> x <bits> --> <bits> adder"""
+    """Adds two integer values using binary two's complement arithmetic."""
+
     def __init__(self, bits):
-        self.bits = bits
+        """Set the number of bits for the inputs."""
+        self._bits = bits
         self.overflow = False
         self.input_nodes = [None, None]
 
@@ -110,12 +149,12 @@ class Add():
         if any([node is None for node in self.input_nodes]):
             raise RuntimeError("not all inputs are connected")
         [valueA, valueB] = [node.get_output() for node in self.input_nodes]
-        if (test_overflow(valueA, self.bits) or test_overflow(valueB, self.bits)):
+        if (_test_overflow(valueA, self._bits) or _test_overflow(valueB, self._bits)):
             raise ValueError("input overflow")
         else:
             S = valueA + valueB
-            self.overflow = test_overflow(S, self.bits)
-            return truncate(S, self.bits)
+            self.overflow = _test_overflow(S, self._bits)
+            return _truncate(S, self._bits)
 
 class Multiply():
     """<data_bits> x <fact_bits> --> <data_bits> multiplier
@@ -130,7 +169,7 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
         self.input_nodes = [None]
 
     def set_factor(self, factor):
-        if test_overflow(factor, self.fact_bits):
+        if _test_overflow(factor, self.fact_bits):
             raise ValueError("input overflow")
         else:
             self.factor = factor
@@ -144,17 +183,17 @@ where <data_bits> are taken <magn_bits> from the right (LSB)"""
         if input_node is None:
             raise RuntimeError("input is not connected")
         value = input_node.get_output()
-        if test_overflow(value, self.data_bits):
+        if _test_overflow(value, self.data_bits):
             raise ValueError("input overflow")
         else:
             P = (value*self.factor) >> self.magn_bits
-            self.overflow = test_overflow(P, self.data_bits)
-            return limit(P, self.data_bits)
+            self.overflow = _test_overflow(P, self.data_bits)
+            return _limit(P, self.data_bits)
 
 class Delay():
     """stores one <bits> bit number"""
     def __init__(self, bits):
-        self.bits = bits
+        self._bits = bits
         self.value = 0
         self.next_value = 0
         self.input_nodes = [None]
@@ -170,7 +209,7 @@ class Delay():
         if input_node is None:
             raise RuntimeError("input is not connected")
         value = input_node.get_output()
-        if test_overflow(value, self.bits):
+        if _test_overflow(value, self._bits):
             raise ValueError("input overflow")
         else:
             self.next_value = value
