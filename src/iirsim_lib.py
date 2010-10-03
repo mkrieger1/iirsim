@@ -50,7 +50,7 @@ def _truncate(x, N):
     With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
     For -B <= x < B, x remains unchanged.
     """
-    if isinstance(x, int):
+    if not isinstance(x, int):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return ((x+B) % 2**N) - B
@@ -63,7 +63,7 @@ def _limit(x, N):
     -B  is returned for x < -B,
     for -B <= x < B, x remains unchanged.
     """
-    if isinstance(x, int):
+    if not isinstance(x, int):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     if x < -B:
@@ -75,7 +75,7 @@ def _limit(x, N):
 
 def _test_overflow(x, N):
     """Test if integer x can be represented as N bit two's complement number."""
-    if isinstance(x, int):
+    if not isinstance(x, int):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return (x < -B) or (x > B-1)
@@ -83,20 +83,31 @@ def _test_overflow(x, N):
 # base class: _FilterComponent
 #--------------------------------------------------------------------
 class _FilterComponent():
+    """Base class for Const, Delay, Add, Multiply"""
+
     def __init__(self, ninputs, bits):
-        if isinstance(ninputs, int):
+        if not isinstance(ninputs, int):
             raise TypeError("number of inputs must be 'int'")
         elif ninputs < 0:
             raise ValueError("number of inputs must not be negative")
-        elif isinstance(bits, int):
+        elif not isinstance(bits, int):
             raise TypeError("number of bits must be 'int'")
         elif bits < 1:
             raise ValueError("number of bits must be positive")
         else:
             self._input_nodes = [None for i in range(ninputs)]
+            self._ninputs = ninputs
             self._bits = bits
 
     def connect(self, input_nodes):
+        if not isinstance(input_nodes, list):
+            raise TypeError("list of input nodes expected")
+        elif not len(input_nodes) == self._ninputs:
+            raise ValueError("number of input nodes must be %i" % self._ninputs)
+        elif not all([isinstance(x, _FilterComponent) for x in input_nodes]):
+            raise TypeError("input nodes must be instance of _FilterComponent")
+        else:
+            self._input_nodes = input_nodes
         
     def get_output(self):
         raise NotImplementedError
