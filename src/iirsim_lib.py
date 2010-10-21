@@ -109,8 +109,13 @@ class _FilterComponent():
         else:
             self._input_nodes = input_nodes
         
+    def set_bits(self, bits):
+        raise NotImplementedError
+        # TODO
+
     def get_output(self):
         raise NotImplementedError
+        # must be overridden by child class
 
 # Const, Add, Multiply, Delay are inherited from the _FilterComponent base class
 #--------------------------------------------------------------------
@@ -144,27 +149,25 @@ class Const(_FilterComponent):
         """Return the stored value."""
         return self.value
 
-class Add():
+class Add(_FilterComponent):
     """Adds two integer values using binary two's complement arithmetic."""
 
     def __init__(self, bits):
         """Set the number of bits for the inputs."""
-        self._bits = bits
-        self.overflow = False
-        self.input_nodes = [None, None]
-
-    def connect(self, input_nodes):
-        self.input_nodes = input_nodes
+        try:
+            _FilterComponent.__init__(self, 2, bits)
+        except (TypeError, ValueError):
+            raise
 
     def get_output(self):
+        """Return the sum of the input values, truncate if necessary."""
         if any([node is None for node in self.input_nodes]):
             raise RuntimeError("not all inputs are connected")
-        [valueA, valueB] = [node.get_output() for node in self.input_nodes]
-        if (_test_overflow(valueA, self._bits) or _test_overflow(valueB, self._bits)):
+        input_values = [node.get_output() for node in self.input_nodes]
+        if any([_test_overflow(value, self._bits) for value in input_values]):
             raise ValueError("input overflow")
         else:
-            S = valueA + valueB
-            self.overflow = _test_overflow(S, self._bits)
+            S = sum(input_values)
             return _truncate(S, self._bits)
 
 class Multiply():
