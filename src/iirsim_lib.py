@@ -254,52 +254,56 @@ class Delay(_FilterComponent):
 # wrapper
 #--------------------------------------------------------------------
 class Filter():
-    def __init__(self, in_node, out_node):
-        if in_node.__class__ is not Const:
-            raise TypeError("input node must be a Const instance")
-        self.in_node = in_node
-        self.out_node = out_node
-        self.nodes = []
-        self.delay_nodes = []
-        # build list of all nodes and list of delay nodes (which need the clock
-        # signal) by depth-first-search beginning at output node
-        node_stack = [out_node]
-        while len(node_stack):
-            node = node_stack.pop()
-            if node not in self.nodes:
-                self.nodes.append(node)
-                if node.__class__ is Delay:
-                    self.delay_nodes.append(node)
-                for input_node in node.input_nodes:
-                    node_stack.append(input_node)
-        # build adjacency list (was: using the dictionary)
-        # TODO using the list
-        #self.adjacency = [None] * len(self.nodes)
-        #for [node, index] in self.nodes.items():
-        #    neighbor_index = \
-        #        [self.nodes[neighbor] for neighbor in node.input_nodes]
-        #    self.adjacency[index] = neighbor_index
+    def __init__(self, node_list, adjacency_list, in_node, out_node):
+        """Connect nodes to a graph structure forming a filter.
+        
+        node_list:      List of _FilterNode instances.
 
-    def clk(self):
+        adjacency_list: Defines the connections between the nodes.
+
+        in_node:        Index of the node in node_list that serves as filter
+                        input. The input node must be an instance of Const.
+
+        out_node:       Index of the node in node_list that serves as filter
+                        output.
+        """
+        if not isinstance(node_list, list):
+            raise TypeError('list of filter nodes expected')
+        elif not all([isinstance(node, _FilterNode) for node in node_list]):
+            raise TypeError('filter nodes must be _FilterNode instances')
+        if not isinstance(node_list[in_node], Const):
+            raise TypeError("input node must be Const instance")
+        self.nodes = node_list
+        self.in_node = node_list[in_node]
+        self.out_node = node_list[out_node]
+        self.delay_nodes = filter(lambda x: isinstance(x, Delay), self.nodes)
+                           # this has nothing to do with IIR filters
+
+        for n in range(len(self.nodes)):
+            node = self.nodes[n]
+            input_nodes = [self.nodes[i] for i in adjacency_list[n]]
+            try:
+                node.connect(input_nodes)
+            except (TypeError, ValueError):
+                raise
+
+    def update(self):
+        """Update all Delay nodes."""
         for node in self.delay_nodes:
             node.sample()
         for node in self.delay_nodes:
             node.clk()
 
     def reset(self):
+        """Reset all Delay nodes."""
         for node in self.delay_nodes:
             node.reset()
 
-    def filter(self, input_values):
-        for v in input_values:
-            self.in_node.set_value(v)
-            yield self.out_node.get_output()
-            self.clk()
-        self.in_node.set_value(0)
-        # continue after input sequence is over (--> IIR)
-        while True:
-            yield self.out_node.get_output()
-            self.clk()
+    def feed(self, input_value):
+        """Feed new input value into the filter and return output value."""
+            self.update()
+            self.in_node.set_value(input_value)
+            return self.out_node.get_output()
         
 # putting it all together
 #--------------------------------------------------------------------
