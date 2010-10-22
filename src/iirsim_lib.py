@@ -108,6 +108,14 @@ class _FilterComponent():
             raise TypeError("input nodes must be instance of _FilterComponent")
         else:
             self._input_nodes = input_nodes
+
+    def _get_input_values(self):
+        if any([node is None for node in self.input_nodes]):
+            raise RuntimeError("not all inputs are connected")
+        input_values = [node.get_output() for node in self.input_nodes]
+        if any([_test_overflow(value, self._bits) for value in input_values]):
+            raise ValueError("input overflow")
+        return input_values
         
     def set_bits(self, bits):
         raise NotImplementedError
@@ -128,7 +136,10 @@ class Const(_FilterComponent):
             _FilterComponent.__init__(self, 0, bits)
         except (TypeError, ValueError):
             raise
-        self.set_value(value)
+        try:
+            self.set_value(value)
+        except (TypeError, ValueError):
+            raise
 
     def set_value(self, value):
         """Set the stored value.
@@ -161,79 +172,84 @@ class Add(_FilterComponent):
 
     def get_output(self):
         """Return the sum of the input values, truncate if necessary."""
-        if any([node is None for node in self.input_nodes]):
-            raise RuntimeError("not all inputs are connected")
-        input_values = [node.get_output() for node in self.input_nodes]
-        if any([_test_overflow(value, self._bits) for value in input_values]):
-            raise ValueError("input overflow")
-        else:
+        try:
+            input_values = self._get_input_values()
             S = sum(input_values)
             return _truncate(S, self._bits)
+        except (RuntimeError, ValueError):
+            raise
 
-class Multiply():
-    """<data_bits> x <fact_bits> --> <data_bits> multiplier
-where <data_bits> are taken <magn_bits> from the right (LSB)"""
-    def __init__(self, data_bits, fact_bits, magn_bits):
-        self.data_bits = data_bits
-        self.fact_bits = fact_bits
-        self.magn_bits = magn_bits
-        self.factor = 0
-        self.eff_factor_str = "0/%i" % 2**magn_bits
-        self.overflow = False
-        self.input_nodes = [None]
+class Multiply(_FilterComponent):
+    """Multiplies the input value by a constant factor."""
+    def __init__(self, bits, factor_bits, scale_bits, factor=0):
+        """Set the number of bits for the input, the factor and the scale."""
+        try:
+            _FilterComponent.__init__(self, 1, bits)
+        except (TypeError, ValueError):
+            raise
+
+        if not isinstance(factor_bits, int):
+            raise TypeError("factor_bits must be 'int'")
+        elif factor_bits < 2:
+            raise ValueError("factor_bits must be at least 2")
+        else:
+            self.factor_bits = factor_bits
+
+        if not isinstance(scale_bits, int):
+            raise TypeError("scale_bits must be 'int'")
+        elif scale_bits < 0:
+            raise ValueError("scale_bits must not be negative")
+        else:
+            self.scale_bits = scale_bits
+
+        self.set_factor(factor)
 
     def set_factor(self, factor):
-        if _test_overflow(factor, self.fact_bits):
+        """Set the factor."""
+        if _test_overflow(factor, self.factor_bits):
             raise ValueError("input overflow")
         else:
-            self.factor = factor
-            self.eff_factor_str = "%i/%i" % (factor, 2**(self.magn_bits))
-
-    def connect(self, input_node):
-        self.input_nodes = [input_node]
+            self._factor = factor
 
     def get_output(self):
-        [input_node] = self.input_nodes
-        if input_node is None:
-            raise RuntimeError("input is not connected")
-        value = input_node.get_output()
-        if _test_overflow(value, self.data_bits):
-            raise ValueError("input overflow")
-        else:
-            P = (value*self.factor) >> self.magn_bits
-            self.overflow = _test_overflow(P, self.data_bits)
+        """Return multiple of the input value, limit if necessary."""
+        try:
+            [input_value] = self._get_input_values()
+            P = (input_value*self._factor) >> self.scale_bits
             return _limit(P, self.data_bits)
+        except (RuntimeError, ValueError):
+            raise
 
-class Delay():
-    """stores one <bits> bit number"""
+class Delay(_FilterComponent):
+    """Stores the input value."""
     def __init__(self, bits):
-        self._bits = bits
-        self.value = 0
-        self.next_value = 0
-        self.input_nodes = [None]
-
-    def connect(self, input_node):
-        self.input_nodes = [input_node]
-
-    def get_output(self):
-        return self.value
-
-    def sample(self):
-        [input_node] = self.input_nodes
-        if input_node is None:
-            raise RuntimeError("input is not connected")
-        value = input_node.get_output()
-        if _test_overflow(value, self._bits):
-            raise ValueError("input overflow")
-        else:
-            self.next_value = value
-
-    def clk(self):
-        self.value = self.next_value
+        """Set the number of bits for the input."""
+        try:
+            _FilterComponent.__init__(self, 1, bits)
+        except (TypeError, ValueError):
+            raise
+        self.reset()
 
     def reset(self):
-        self.value = 0
-        self.next_value = 0
+        """Set current and next value to 0."""
+        self._value = 0
+        self._next_value = 0
+
+    def clk(self):
+        """Update current value with next value."""
+        self._value = self._next_value
+
+    def sample(self):
+        """Set input value as next value."""
+        try:
+            [input_value] = self._get_input_values()
+            self._next_value = input_value
+        except (RuntimeError, ValueError):
+            raise
+
+    def get_output(self):
+        """Return current value."""
+        return self._value
 
 # wrapper
 #--------------------------------------------------------------------
