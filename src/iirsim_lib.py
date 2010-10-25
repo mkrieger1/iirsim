@@ -79,9 +79,9 @@ class _FilterComponent():
             self._bits = bits
 
     def _get_input_values(self):
-        if any([node is None for node in self.input_nodes]):
+        if any([node is None for node in self._input_nodes]):
             raise RuntimeError("not all inputs are connected")
-        input_values = [node.get_output() for node in self.input_nodes]
+        input_values = [node.get_output() for node in self._input_nodes]
         if any([_test_overflow(value, self._bits) for value in input_values]):
             raise ValueError("input overflow")
         return input_values
@@ -174,20 +174,20 @@ class Multiply(_FilterComponent):
         elif factor_bits < 2:
             raise ValueError("factor_bits must be at least 2")
         else:
-            self.factor_bits = factor_bits
+            self._factor_bits = factor_bits
 
         if not isinstance(scale_bits, int):
             raise TypeError("scale_bits must be 'int'")
         elif scale_bits < 0:
             raise ValueError("scale_bits must not be negative")
         else:
-            self.scale_bits = scale_bits
+            self._scale_bits = scale_bits
 
         self.set_factor(factor)
 
     def set_factor(self, factor):
         """Set the factor."""
-        if _test_overflow(factor, self.factor_bits):
+        if _test_overflow(factor, self._factor_bits):
             raise ValueError("input overflow")
         else:
             self._factor = factor
@@ -196,8 +196,8 @@ class Multiply(_FilterComponent):
         """Return multiple of the input value using saturation arithmetic."""
         try:
             [input_value] = self._get_input_values()
-            P = (input_value*self._factor) >> self.scale_bits
-            return _saturate(P, self.data_bits)
+            P = (input_value*self._factor) >> self._scale_bits
+            return _saturate(P, self._bits)
         except (RuntimeError, ValueError):
             raise
 
@@ -237,7 +237,7 @@ class Filter():
     def __init__(self, node_list, adjacency_list, in_node, out_node):
         """Connect nodes to a graph structure forming a filter.
         
-        node_list:      List of _FilterNode instances.
+        node_list:      List of _FilterComponent instances.
 
         adjacency_list: Defines the connections between the nodes.
 
@@ -249,8 +249,8 @@ class Filter():
         """
         if not isinstance(node_list, list):
             raise TypeError('list of filter nodes expected')
-        elif not all([isinstance(node, _FilterNode) for node in node_list]):
-            raise TypeError('filter nodes must be _FilterNode instances')
+        elif not all([isinstance(node, _FilterComponent) for node in node_list]):
+            raise TypeError('filter nodes must be _FilterComponent instances')
         if not isinstance(node_list[in_node], Const):
             raise TypeError("input node must be Const instance")
         self.nodes = node_list
