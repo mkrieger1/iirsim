@@ -17,13 +17,13 @@ get_output() -- Return the output value by either calling get_output() of the
                 input node(s) recursively and performing the appropriate
                 arithmetic (Add, Multiply) or by returning the currently
                 stored value (Const, Delay).
-set_bits()   -- Set the number of bits used for the input and output values..
+set_bits()   -- Set the number of bits used for the input and output values.
 """
 
 # internally used functions
 #--------------------------------------------------------------------
-def _truncate(x, N):
-    """Truncate integer x to N bit two's complement number.
+def _wrap(x, N):
+    """Reduce integer x to N bits, wrapping in case of overflow.
    
     With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
     For -B <= x < B, x remains unchanged.
@@ -33,8 +33,8 @@ def _truncate(x, N):
     B = 2**(N-1)
     return ((x+B) % 2**N) - B
 
-def _limit(x, N):
-    """Limit integer x to N bit two's complement number.
+def _saturate(x, N):
+    """Reduce integer x to N bits, saturating in case of overflow.
 
     With B = 2^(N-1) the largest absolute value,
     B-1 is returned for x > B-1,
@@ -88,6 +88,7 @@ class _FilterComponent():
         
     # public methods
     def connect(self, input_nodes):
+        "Set the input nodes."
         if not isinstance(input_nodes, list):
             raise TypeError("list of input nodes expected")
         elif not len(input_nodes) == self._ninputs:
@@ -151,11 +152,11 @@ class Add(_FilterComponent):
             raise
 
     def get_output(self):
-        """Return the sum of the input values, truncate if necessary."""
+        """Return the sum of the input values using modular arithmetic."""
         try:
             input_values = self._get_input_values()
             S = sum(input_values)
-            return _truncate(S, self._bits)
+            return _wrap(S, self._bits)
         except (RuntimeError, ValueError):
             raise
 
@@ -192,11 +193,11 @@ class Multiply(_FilterComponent):
             self._factor = factor
 
     def get_output(self):
-        """Return multiple of the input value, limit if necessary."""
+        """Return multiple of the input value using saturation arithmetic."""
         try:
             [input_value] = self._get_input_values()
             P = (input_value*self._factor) >> self.scale_bits
-            return _limit(P, self.data_bits)
+            return _saturate(P, self.data_bits)
         except (RuntimeError, ValueError):
             raise
 
@@ -231,9 +232,8 @@ class Delay(_FilterComponent):
         """Return current value."""
         return self._value
 
-# wrapper
-#--------------------------------------------------------------------
 class Filter():
+    """This class makes a filter out of individual filter nodes."""
     def __init__(self, node_list, adjacency_list, in_node, out_node):
         """Connect nodes to a graph structure forming a filter.
         
@@ -281,7 +281,7 @@ class Filter():
 
     def feed(self, input_value):
         """Feed new input value into the filter and return output value."""
-            self.update()
-            self.in_node.set_value(input_value)
-            return self.out_node.get_output()
+        self.update()
+        self.in_node.set_value(input_value)
+        return self.out_node.get_output()
         
