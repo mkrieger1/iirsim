@@ -17,7 +17,6 @@ get_output() -- Return the output value by either calling get_output() of the
                 input node(s) recursively and performing the appropriate
                 arithmetic (Add, Multiply) or by returning the currently
                 stored value (Const, Delay).
-set_bits()   -- Set the number of bits used for the input and output values.
 """
 
 # internally used functions
@@ -98,10 +97,6 @@ class _FilterComponent():
         else:
             self._input_nodes = input_nodes
 
-    def set_bits(self, bits):
-        raise NotImplementedError
-        # TODO
-
     def get_output(self):
         raise NotImplementedError
         # must be overridden by child class
@@ -133,13 +128,13 @@ class Const(_FilterComponent):
             if input_overflow:
                 raise ValueError("input overflow")
             else:
-                self.value = value
+                self._value = value
         except TypeError:
             raise
     
     def get_output(self):
         """Return the stored value."""
-        return self.value
+        return self._value
 
 class Add(_FilterComponent):
     """Adds two integer values using binary two's complement arithmetic."""
