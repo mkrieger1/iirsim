@@ -11,35 +11,13 @@ Delay    -- Output is the previously stored input value.
 Add      -- Output is the sum of two input values.
 Multiply -- Output is the input value multiplied by a constant factor.
 
-Common class methods:
-connect() (all except Const) -- Set the input node(s).
-get_output() (all)           -- Return the output value by either calling
-                                get_output() of the input node(s) recursively
-                                and performing the appropriate arithmetic
-                                (Add, Multiply) or by returning the currently
-                                stored value (Const, Delay).
-set_bits() (all)             -- Set the number of bits used for the input and
-                                output values..
-
-#------------ runter ------------------------------
-sample() (Delay)             -- Call get_output() recursively on the input
-                                components and store the output as 'next
-                                value'. *
-clk() (Delay)                -- Replace currently stored value by 'next
-                                value'. *
-set_value() (Const)          -- Define currently stored value. This component
-                                is meant to be used as external input for the
-                                whole filter (i.e. to resolve the recursion).
-set_factor() (Multiply)      -- Define the factor by which the input value is
-                                multiplied when get_output() is called.
-
-                                * Note:
-                                sample() and clk() are implemented as separate
-                                functions, because the 'next value' must be
-                                saved for all Delay components before the
-                                output values are replaced, in order to
-                                simulate concurrency.
-#------------ runter ------------------------------
+Methods available for all classes:
+connect()    -- Set the input node(s).
+get_output() -- Return the output value by either calling get_output() of the
+                input node(s) recursively and performing the appropriate
+                arithmetic (Add, Multiply) or by returning the currently
+                stored value (Const, Delay).
+set_bits()   -- Set the number of bits used for the input and output values..
 """
 
 # internally used functions
@@ -85,6 +63,7 @@ def _test_overflow(x, N):
 class _FilterComponent():
     """Base class for Const, Delay, Add, Multiply"""
 
+    # internally used methods
     def __init__(self, ninputs, bits):
         if not isinstance(ninputs, int):
             raise TypeError("number of inputs must be 'int'")
@@ -99,6 +78,15 @@ class _FilterComponent():
             self._ninputs = ninputs
             self._bits = bits
 
+    def _get_input_values(self):
+        if any([node is None for node in self.input_nodes]):
+            raise RuntimeError("not all inputs are connected")
+        input_values = [node.get_output() for node in self.input_nodes]
+        if any([_test_overflow(value, self._bits) for value in input_values]):
+            raise ValueError("input overflow")
+        return input_values
+        
+    # public methods
     def connect(self, input_nodes):
         if not isinstance(input_nodes, list):
             raise TypeError("list of input nodes expected")
@@ -109,14 +97,6 @@ class _FilterComponent():
         else:
             self._input_nodes = input_nodes
 
-    def _get_input_values(self):
-        if any([node is None for node in self.input_nodes]):
-            raise RuntimeError("not all inputs are connected")
-        input_values = [node.get_output() for node in self.input_nodes]
-        if any([_test_overflow(value, self._bits) for value in input_values]):
-            raise ValueError("input overflow")
-        return input_values
-        
     def set_bits(self, bits):
         raise NotImplementedError
         # TODO
@@ -236,7 +216,7 @@ class Delay(_FilterComponent):
         self._next_value = 0
 
     def clk(self):
-        """Update current value with next value."""
+        """Replace current value with next value."""
         self._value = self._next_value
 
     def sample(self):
