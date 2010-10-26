@@ -2,71 +2,93 @@ import os
 from PyQt4 import QtCore, QtGui
 
 class FactorSlider(QtGui.QWidget):
-    def __init__(self, title, factor_bits, scale_bits=None):
+    def __init__(self, name, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
-        self.factor_bits = factor_bits
-        self.scale_bits = factor_bits-2 if scale_bits is None else scale_bits
+        if scale_bits is None:
+            scale_bits = factor_bits-2
+        self.scale = 2**scale_bits
+
+        # name label
+        nameLabel = QtGui.QLabel(name)
+        nameLabel.setAlignment(QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.nameLabel = nameLabel
 
         # slider
         minValue = -2**(factor_bits-1)
         maxValue =  2**(factor_bits-1) - 1
         interval = max(1, 2**(factor_bits-4))
 
-        self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.slider.setRange(minValue, maxValue)
-        self.slider.setValue(0)
-        self.slider.setPageStep(interval)
-        self.slider.setTickInterval(interval)
-        self.slider.setTickPosition(self.slider.TicksBelow)
+        slider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        slider.setRange(minValue, maxValue)
+        slider.setValue(0)
+        slider.setPageStep(interval)
+        slider.setTickInterval(interval)
+        slider.setTickPosition(slider.TicksBelow)
+        slider.setMinimumWidth(50)
+        self.slider = slider
 
-        # label
-        self.label = QtGui.QLabel()
-        self.label.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+        # value label
+        self.valueLabel = QtGui.QLabel()
+        self.valueLabel.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+
+        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
+                     self.updateLabel)
+
         self.updateLabel()
-
-        # title
-        self.title = QtGui.QLabel()
-        self.title.setText(title)
-
-        # layout
-        self.title.setMinimumWidth(120)
-        self.slider.setMinimumWidth(100)
-        self.label.setMinimumWidth(120)
-        hbox = QtGui.QHBoxLayout()
-        hbox.addWidget(self.title)
-        hbox.addWidget(self.slider)
-        hbox.addWidget(self.label)
-        self.setLayout(hbox)
-
-        # signals
-        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'),
-            self.updateLabel)
 
     def updateLabel(self):
         value = self.slider.value()
-        scale = 2**self.scale_bits
-        text = '%i/%i = %6.3f' % (value, scale, float(value)/scale)
-        self.label.setText(text)
+        scale = self.scale
+        text = '%6i/%i = %6.3f' % (value, scale, float(value)/scale)
+        self.valueLabel.setText(text)
+
+class FactorSliderArray(QtGui.QWidget):
+    def __init__(self, names, factor_bits, scale_bits=None):
+        QtGui.QWidget.__init__(self)
+
+        gridLayout = QtGui.QGridLayout()
+
+        self.factorSliders = [FactorSlider(name, factor_bits) for name in names]
+        for (row,factorSlider) in enumerate(self.factorSliders):
+            gridLayout.addWidget(factorSlider.nameLabel,  row, 0)
+            gridLayout.addWidget(factorSlider.slider,     row, 1)
+            gridLayout.addWidget(factorSlider.valueLabel, row, 2)
+
+        # layout
+        #self.title.setMinimumWidth(120)
+        #self.slider.setMinimumWidth(100)
+        #self.label.setMinimumWidth(120)
+        self.setLayout(gridLayout)
+
+        # signals
 
     
-class iirSimMainWindow(QtGui.QWidget):
+class IIRSimCentralWidget(QtGui.QWidget):
     def __init__(self):
         QtGui.QWidget.__init__(self)
 
-        self.mainTitle = 'IIRSim'
-        self.setWindowTitle(self.mainTitle)
-
         # Global Layout
         globalVBox = QtGui.QVBoxLayout()
-        globalVBox.addWidget(FactorSlider('a1', 4))
-        globalVBox.addWidget(FactorSlider('hans', 6))
-        globalVBox.addWidget(FactorSlider('abrakadabra', 9))
+        globalVBox.addWidget(FactorSliderArray(['a1', 'hans', 'wurst'], 4))
         self.setLayout(globalVBox)
 
-        mainSize = self.sizeHint()
-        mainSize.setWidth(640)
-        self.resize(mainSize)
+class IIRSimMainWindow(QtGui.QMainWindow):
+    def __init__(self):
+        QtGui.QMainWindow.__init__(self)
+        mainTitle = 'IIRSim'
+        self.setWindowTitle(mainTitle)
+
+        self.setCentralWidget(IIRSimCentralWidget())
+
+
+
+        #mainSize = self.sizeHint()
+        #mainSize.setWidth(640)
+        #self.resize(mainSize)
+        statusBar = QtGui.QStatusBar()
+        statusBar.addWidget(QtGui.QLabel(mainTitle))
+        self.setStatusBar(statusBar)
 
 ## modified LineEdit which accepts dropped files and puts the file path
 #class LineEditFileDrop(QtGui.QLineEdit):
