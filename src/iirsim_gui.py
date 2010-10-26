@@ -1,32 +1,40 @@
 import os
 from PyQt4 import QtCore, QtGui
 
+class QSlider_autoticks(QtGui.QSlider):
+    """A slider with self adjusting tick marks."""
+    def __init__(self, orientation, tick_min_distance):
+        QtGui.QSlider.__init__(self, orientation)
+        self.setTickPosition(self.TicksBelow)
+        self.tick_min_distance = tick_min_distance
+
+    def resizeEvent(self, event):
+        width = self.width()
+        value_range = self.maximum() - self.minimum()
+        interval = 1
+        while (interval*width/value_range < self.tick_min_distance):
+            interval = 2*interval
+        self.setTickInterval(interval)
+
 class FactorSlider(QtGui.QWidget):
+    """A slider with name and value label."""
     def __init__(self, name, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
         if scale_bits is None:
             scale_bits = factor_bits-2
         self.scale = 2**scale_bits
+        self.factor_bits = factor_bits
 
         # name label
-        nameLabel = QtGui.QLabel(name)
-        nameLabel.setAlignment(QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
-        self.nameLabel = nameLabel
+        self.nameLabel = QtGui.QLabel(name)
+        self.nameLabel.setAlignment(QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
 
         # slider
-        minValue = -2**(factor_bits-1)
-        maxValue =  2**(factor_bits-1) - 1
-        interval = max(1, 2**(factor_bits-4))
-
-        slider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        slider.setRange(minValue, maxValue)
-        slider.setValue(0)
-        slider.setPageStep(interval)
-        slider.setTickInterval(interval)
-        slider.setTickPosition(slider.TicksBelow)
-        slider.setMinimumWidth(50)
-        self.slider = slider
+        self.slider = QSlider_autoticks(QtCore.Qt.Horizontal, 10)
+        self.slider.setRange(-2**(factor_bits-1), 2**(factor_bits-1)-1)
+        self.slider.setValue(0)
+        self.slider.setPageStep(max(1, 2**(factor_bits-3)))
 
         # value label
         self.valueLabel = QtGui.QLabel()
@@ -34,43 +42,51 @@ class FactorSlider(QtGui.QWidget):
 
         self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
                      self.updateLabel)
-
         self.updateLabel()
 
     def updateLabel(self):
         value = self.slider.value()
         scale = self.scale
-        text = '%6i/%i = %6.3f' % (value, scale, float(value)/scale)
+        text = '%i/%i = %6.3f' % (value, scale, float(value)/scale)
         self.valueLabel.setText(text)
 
-class FactorSliderArray(QtGui.QWidget):
+    def getMinLabelWidth(self):
+        label = QtGui.QLabel()
+        value = -2**(self.factor_bits-1)
+        scale = self.scale
+        text = '%i/%i = %6.3f' % (value, scale, float(value)/scale)
+        label.setText(text)
+        return label.minimumSizeHint().width()
+
+class FactorSliderGrid(QtGui.QWidget):
     def __init__(self, names, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
-        gridLayout = QtGui.QGridLayout()
+        self.factorSliders = [FactorSlider(name, factor_bits, scale_bits) for name in names]
 
-        self.factorSliders = [FactorSlider(name, factor_bits) for name in names]
-        for (row,factorSlider) in enumerate(self.factorSliders):
+        gridLayout = QtGui.QGridLayout()
+        for (row, factorSlider) in enumerate(self.factorSliders):
             gridLayout.addWidget(factorSlider.nameLabel,  row, 0)
             gridLayout.addWidget(factorSlider.slider,     row, 1)
             gridLayout.addWidget(factorSlider.valueLabel, row, 2)
-
-        # layout
-        #self.title.setMinimumWidth(120)
-        #self.slider.setMinimumWidth(100)
-        #self.label.setMinimumWidth(120)
+        minLabelWidth = max([slider.getMinLabelWidth() \
+                             for slider in self.factorSliders])
+        gridLayout.setColumnMinimumWidth(1, 50)
+        gridLayout.setColumnMinimumWidth(2, minLabelWidth)
         self.setLayout(gridLayout)
-
-        # signals
-
     
 class IIRSimCentralWidget(QtGui.QWidget):
     def __init__(self):
         QtGui.QWidget.__init__(self)
 
+        # Factor Slider Array
+        names = ['schieberegler', 'hans', 'wurst']
+        factor_bits = 8
+        slider_grid = FactorSliderGrid(names, factor_bits)
+
         # Global Layout
         globalVBox = QtGui.QVBoxLayout()
-        globalVBox.addWidget(FactorSliderArray(['a1', 'hans', 'wurst'], 4))
+        globalVBox.addWidget(slider_grid)
         self.setLayout(globalVBox)
 
 class IIRSimMainWindow(QtGui.QMainWindow):
@@ -87,7 +103,7 @@ class IIRSimMainWindow(QtGui.QMainWindow):
         #mainSize.setWidth(640)
         #self.resize(mainSize)
         statusBar = QtGui.QStatusBar()
-        statusBar.addWidget(QtGui.QLabel(mainTitle))
+        statusBar.addWidget(QtGui.QLabel('Ready'))
         self.setStatusBar(statusBar)
 
 ## modified LineEdit which accepts dropped files and puts the file path
