@@ -17,7 +17,7 @@ class QSlider_autoticks(QtGui.QSlider):
         self.setTickInterval(interval)
 
 class FactorSlider(QtGui.QWidget):
-    """A slider with name and value label."""
+    """A slider with name and value label and a spin box."""
     def __init__(self, name, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
@@ -33,13 +33,12 @@ class FactorSlider(QtGui.QWidget):
         # slider
         self.slider = QSlider_autoticks(QtCore.Qt.Horizontal, 10)
         self.slider.setRange(-2**(factor_bits-1), 2**(factor_bits-1)-1)
-        self.slider.setValue(0)
         self.slider.setPageStep(max(1, 2**(factor_bits-3)))
+        self.slider.setValue(0)
 
         # value label
         self.valueLabel = QtGui.QLabel()
         self.valueLabel.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
-        self.updateLabel()
 
         # spinbox
         self.spinBox = QtGui.QDoubleSpinBox()
@@ -50,44 +49,55 @@ class FactorSlider(QtGui.QWidget):
         self.spinBox.setKeyboardTracking(False)
 
         # signals
-        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
-                     self.updateLabel)
-        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
-                     self.updateSpinBox)
         self.connect(self.spinBox, QtCore.SIGNAL('valueChanged(double)'), \
-                     self.updateSlider)
+                     self._updateSlider)
         self.connect(self.spinBox, QtCore.SIGNAL('editingFinished()'), \
-                     self.updateSpinBox)
+                     self._updateSpinBox)
+        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
+                     self._updateLabel)
+        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
+                     self._updateSpinBox)
+        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
+                     self._signalValueChanged)
 
-    def updateLabel(self):
-        text = self.valueLabelText()
-        self.valueLabel.setText(text)
+        # set initial value
+        self._updateLabel()
+        self._signalValueChanged()
 
-    def updateSlider(self):
-        self.slider.setValue(round(self.spinBox.value()*self.scale))
-
-    def updateSpinBox(self):
-        self.spinBox.setValue(float(self.slider.value())/self.scale)
-
-    def getMinLabelWidth(self):
-        label = QtGui.QLabel()
-        value = -2**(self.factor_bits-1)
-        text = self.valueLabelText(value)
-        label.setText(text)
-        return label.minimumSizeHint().width()
-
-    def valueLabelText(self, value=None, scale=None):
+    def _valueLabelText(self, value=None, scale=None):
         if value is None:
             value = self.slider.value()
         if scale is None:
             scale = self.scale
         return '%i/%i =' % (value, scale)
 
+    def _updateLabel(self):
+        text = self._valueLabelText()
+        self.valueLabel.setText(text)
+
+    def _updateSlider(self):
+        self.slider.setValue(round(self.spinBox.value()*self.scale))
+
+    def _updateSpinBox(self):
+        self.spinBox.setValue(float(self.slider.value())/self.scale)
+
+    def _signalValueChanged(self):
+        self.emit(QtCore.SIGNAL('valueChanged()'))
+
+    def getMinLabelWidth(self):
+        label = QtGui.QLabel()
+        value = -2**(self.factor_bits-1)
+        text = self._valueLabelText(value)
+        label.setText(text)
+        return label.minimumSizeHint().width()
+
 class FactorSliderGrid(QtGui.QWidget):
+    """A group of FactorSliders aligned in a grid."""
     def __init__(self, names, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
-        self.factorSliders = [FactorSlider(name, factor_bits, scale_bits) for name in names]
+        self.factorSliders = [FactorSlider(name, factor_bits, scale_bits) \
+                              for name in names]
 
         gridLayout = QtGui.QGridLayout()
         for (row, factorSlider) in enumerate(self.factorSliders):
@@ -95,25 +105,47 @@ class FactorSliderGrid(QtGui.QWidget):
             gridLayout.addWidget(factorSlider.slider,     row, 1)
             gridLayout.addWidget(factorSlider.valueLabel, row, 2)
             gridLayout.addWidget(factorSlider.spinBox,    row, 3)
+            self.connect(factorSlider, QtCore.SIGNAL('valueChanged()'), \
+                         self._signalValueChanged)
         minLabelWidth = max([slider.getMinLabelWidth() \
                              for slider in self.factorSliders])
         gridLayout.setColumnMinimumWidth(1, 50)
         gridLayout.setColumnMinimumWidth(2, minLabelWidth)
         self.setLayout(gridLayout)
-    
+
+    def _signalValueChanged(self):
+        self.emit(QtCore.SIGNAL('valueChanged()'))
+
+    def getValues(self):
+        return [factorSlider.slider.value() \
+                for factorSlider in self.factorSliders]
+
+
+#--------------------------------------------------
+# Top Level ab hier
+#--------------------------------------------------
+
 class IIRSimCentralWidget(QtGui.QWidget):
     def __init__(self):
         QtGui.QWidget.__init__(self)
 
         # Factor Slider Array
         names = ['b0', 'b1', 'b2', 'a1', 'a2']
-        factor_bits = 7
-        slider_grid = FactorSliderGrid(names, factor_bits)
+        factor_bits = 12
+        self.slider_grid = FactorSliderGrid(names, factor_bits)
 
         # Global Layout
         globalVBox = QtGui.QVBoxLayout()
-        globalVBox.addWidget(slider_grid)
+        globalVBox.addWidget(self.slider_grid)
+        globalVBox.addStretch()
         self.setLayout(globalVBox)
+
+        # signals
+        self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
+                     self.printNewValues)
+
+    def printNewValues(self):
+        print self.slider_grid.getValues()
 
 class IIRSimMainWindow(QtGui.QMainWindow):
     def __init__(self):
