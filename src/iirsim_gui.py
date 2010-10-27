@@ -39,24 +39,49 @@ class FactorSlider(QtGui.QWidget):
         # value label
         self.valueLabel = QtGui.QLabel()
         self.valueLabel.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
-
-        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
-                     self.updateLabel)
         self.updateLabel()
 
+        # spinbox
+        self.spinBox = QtGui.QDoubleSpinBox()
+        self.spinBox.setMinimum(float(self.slider.minimum())/self.scale)
+        self.spinBox.setMaximum(float(self.slider.maximum())/self.scale)
+        self.spinBox.setSingleStep(1.0/self.scale)
+        self.spinBox.setDecimals(6)
+        self.spinBox.setKeyboardTracking(False)
+
+        # signals
+        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
+                     self.updateLabel)
+        self.connect(self.slider, QtCore.SIGNAL('valueChanged(int)'), \
+                     self.updateSpinBox)
+        self.connect(self.spinBox, QtCore.SIGNAL('valueChanged(double)'), \
+                     self.updateSlider)
+        self.connect(self.spinBox, QtCore.SIGNAL('editingFinished()'), \
+                     self.updateSpinBox)
+
     def updateLabel(self):
-        value = self.slider.value()
-        scale = self.scale
-        text = '%i/%i = %6.3f' % (value, scale, float(value)/scale)
+        text = self.valueLabelText()
         self.valueLabel.setText(text)
+
+    def updateSlider(self):
+        self.slider.setValue(round(self.spinBox.value()*self.scale))
+
+    def updateSpinBox(self):
+        self.spinBox.setValue(float(self.slider.value())/self.scale)
 
     def getMinLabelWidth(self):
         label = QtGui.QLabel()
         value = -2**(self.factor_bits-1)
-        scale = self.scale
-        text = '%i/%i = %6.3f' % (value, scale, float(value)/scale)
+        text = self.valueLabelText(value)
         label.setText(text)
         return label.minimumSizeHint().width()
+
+    def valueLabelText(self, value=None, scale=None):
+        if value is None:
+            value = self.slider.value()
+        if scale is None:
+            scale = self.scale
+        return '%i/%i =' % (value, scale)
 
 class FactorSliderGrid(QtGui.QWidget):
     def __init__(self, names, factor_bits, scale_bits=None):
@@ -69,6 +94,7 @@ class FactorSliderGrid(QtGui.QWidget):
             gridLayout.addWidget(factorSlider.nameLabel,  row, 0)
             gridLayout.addWidget(factorSlider.slider,     row, 1)
             gridLayout.addWidget(factorSlider.valueLabel, row, 2)
+            gridLayout.addWidget(factorSlider.spinBox,    row, 3)
         minLabelWidth = max([slider.getMinLabelWidth() \
                              for slider in self.factorSliders])
         gridLayout.setColumnMinimumWidth(1, 50)
@@ -81,7 +107,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # Factor Slider Array
         names = ['b0', 'b1', 'b2', 'a1', 'a2']
-        factor_bits = 5
+        factor_bits = 7
         slider_grid = FactorSliderGrid(names, factor_bits)
 
         # Global Layout
