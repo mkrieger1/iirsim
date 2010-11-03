@@ -87,7 +87,7 @@ class _FilterComponent():
         
     # public methods
     def connect(self, input_nodes):
-        "Set the input nodes."
+        """Set the input nodes."""
         if not isinstance(input_nodes, list):
             raise TypeError("list of input nodes expected")
         elif not len(input_nodes) == self._ninputs:
@@ -100,6 +100,10 @@ class _FilterComponent():
     def get_output(self):
         raise NotImplementedError
         # must be overridden by child class
+
+    def bits(self):
+        """Return the number of bits."""
+        return self._bits
 
 # Const, Add, Multiply, Delay are inherited from the _FilterComponent base class
 #--------------------------------------------------------------------
@@ -180,10 +184,18 @@ class Multiply(_FilterComponent):
 
         self.set_factor(factor)
 
-    def set_factor(self, factor):
+    def set_factor(self, factor, scaled=False):
         """Set the factor."""
+        if scaled:
+            factor = int(round((1 << self._scale_bits)*factor))
         if _test_overflow(factor, self._factor_bits):
-            raise ValueError("input overflow")
+            min_fact = -1 << self._factor_bits-1
+            max_fact = (1 << self._factor_bits-1)-1 
+            min_fact_sc = float(min_fact)/(1 << self._scale_bits)
+            max_fact_sc = float(max_fact)/(1 << self._scale_bits)
+            raise ValueError( \
+                "factor must be in the range %i to %i (%.6f to %6f scaled)" \
+                             % (min_fact, max_fact, min_fact_sc, max_fact_sc))
         else:
             self._factor = factor
 
@@ -195,6 +207,13 @@ class Multiply(_FilterComponent):
             return _saturate(P, self._bits)
         except (RuntimeError, ValueError):
             raise
+
+    def factor(self, scaled=False):
+        """Return the factor."""
+        if scaled:
+            return float(self._factor)/(2**self._scale_bits)
+        else:
+            return self._factor
 
 class Delay(_FilterComponent):
     """Stores the input value."""
@@ -249,35 +268,55 @@ class Filter():
             raise TypeError('filter nodes must be _FilterComponent instances')
         if not isinstance(node_dict[in_node], Const):
             raise TypeError("input node must be Const instance")
-        self.nodes = node_dict
-        self.in_node = node_dict[in_node]
-        self.out_node = node_dict[out_node]
-        self.delay_nodes = filter(lambda x: isinstance(x, Delay), \
-                                  self.nodes.values())
+        self._nodes = node_dict
+        self._adjacency = adjacency_dict
+        self._in_node = node_dict[in_node]
+        self._out_node = node_dict[out_node]
+        self._delay_nodes = filter(lambda x: isinstance(x, Delay), \
+                                  self._nodes.values())
                # (builtin function 'filter' has nothing to do with IIR filters)
 
-        for (name, node) in self.nodes.iteritems():
-            input_nodes = [self.nodes[n] for n in adjacency_dict[name]]
+        for (name, node) in self._nodes.iteritems():
+            input_nodes = [self._nodes[n] for n in self._adjacency[name]]
             try:
                 node.connect(input_nodes)
             except (TypeError, ValueError):
                 raise
 
-    def update(self):
+    def _update(self):
         """Update all Delay nodes."""
-        for node in self.delay_nodes:
+        for node in self._delay_nodes:
             node.sample()
-        for node in self.delay_nodes:
+        for node in self._delay_nodes:
             node.clk()
 
     def reset(self):
-        """Reset all Delay nodes."""
-        for node in self.delay_nodes:
+        """Reset internal filter state."""
+        for node in self._delay_nodes:
             node.reset()
 
     def feed(self, input_value):
         """Feed new input value into the filter and return output value."""
-        self.update()
-        self.in_node.set_value(input_value)
-        return self.out_node.get_output()
-        
+        self._update()
+        self._in_node.set_value(input_value)
+        return self._out_node.get_output()
+
+    def factors(self, scaled=False):
+        """Return dictionary of Multiply nodes with their factors."""
+        mul_node_names = filter(lambda name: \
+            isinstance(self._nodes[name], Multiply), self._nodes.keys())
+        return dict(zip(mul_node_names, [self._nodes[name].factor(scaled) \
+                                         for name in mul_node_names]))
+
+    def set_factor(self, name, factor, scaled=False):
+        """Set the factor of a Multiply node."""
+        try:
+            mul_node = self._nodes[name]
+        except KeyError:
+            raise KeyError('no node named %s' % name)
+        if not isinstance(mul_node, Multiply):
+            raise TypeError('node %s is not an instance of Multiply' % name)
+        else:
+            mul_node.set_factor(factor, scaled)
+
+
