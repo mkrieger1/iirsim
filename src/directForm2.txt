@@ -17,6 +17,11 @@
 #
 # y[n] = a1 y[n-1] + a2 y[n-2] + b0 x[n] + b1 x[n-1] + b2 x[n-2]
 
+
+bits_global        10
+scale_bits_global   7
+factor_bits_global  9
+
 node Const,    name "const",                         input
 node Add,      name "add1",   connect "const" "add3"
 node Add,      name "add2",   connect "b0" "add4",   output

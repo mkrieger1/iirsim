@@ -229,34 +229,35 @@ class Delay(_FilterComponent):
 
 class Filter():
     """This class makes a filter out of individual filter nodes."""
-    def __init__(self, node_list, adjacency_list, in_node, out_node):
+    def __init__(self, node_dict, adjacency_dict, in_node, out_node):
         """Connect nodes to a graph structure forming a filter.
         
-        node_list:      List of _FilterComponent instances.
+        node_dict:      Dictionary of (name, _FilterComponent) pairs.
 
-        adjacency_list: Defines the connections between the nodes.
+        adjacency_dict: Defines the connections between the nodes.
 
-        in_node:        Index of the node in node_list that serves as filter
+        in_node:        Key of the node in node_dict that serves as filter
                         input. The input node must be an instance of Const.
 
-        out_node:       Index of the node in node_list that serves as filter
+        out_node:       Key of the node in node_dict that serves as filter
                         output.
         """
-        if not isinstance(node_list, list):
-            raise TypeError('list of filter nodes expected')
-        elif not all([isinstance(node, _FilterComponent) for node in node_list]):
+        if not isinstance(node_dict, dict):
+            raise TypeError('dict of filter nodes expected')
+        elif not all([isinstance(node, _FilterComponent) \
+                      for node in node_dict.values()]):
             raise TypeError('filter nodes must be _FilterComponent instances')
-        if not isinstance(node_list[in_node], Const):
+        if not isinstance(node_dict[in_node], Const):
             raise TypeError("input node must be Const instance")
-        self.nodes = node_list
-        self.in_node = node_list[in_node]
-        self.out_node = node_list[out_node]
-        self.delay_nodes = filter(lambda x: isinstance(x, Delay), self.nodes)
-                           # this has nothing to do with IIR filters
+        self.nodes = node_dict
+        self.in_node = node_dict[in_node]
+        self.out_node = node_dict[out_node]
+        self.delay_nodes = filter(lambda x: isinstance(x, Delay), \
+                                  self.nodes.values())
+               # (builtin function 'filter' has nothing to do with IIR filters)
 
-        for n in range(len(self.nodes)):
-            node = self.nodes[n]
-            input_nodes = [self.nodes[i] for i in adjacency_list[n]]
+        for (name, node) in self.nodes.iteritems():
+            input_nodes = [self.nodes[n] for n in adjacency_dict[name]]
             try:
                 node.connect(input_nodes)
             except (TypeError, ValueError):
