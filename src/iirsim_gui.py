@@ -1,6 +1,8 @@
 import os
 from PyQt4 import QtCore, QtGui
 
+import iirsim_cfg
+
 class QSlider_autoticks(QtGui.QSlider):
     """A slider with self adjusting tick marks."""
     def __init__(self, orientation, tick_min_distance):
@@ -91,12 +93,18 @@ class FactorSlider(QtGui.QWidget):
         label.setText(text)
         return label.minimumSizeHint().width()
 
+    def getValue(self):
+        name = str(self.nameLabel.text())
+        value = self.slider.value()
+        return [name, value]
+
 class FactorSliderGrid(QtGui.QWidget):
     """A group of FactorSliders aligned in a grid."""
     def __init__(self, names, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
-        self.factorSliders = [FactorSlider(name, factor_bits, scale_bits) \
+        self.factorSliders = [FactorSlider( \
+                              name, factor_bits[name], scale_bits[name]) \
                               for name in names]
 
         gridLayout = QtGui.QGridLayout()
@@ -117,8 +125,8 @@ class FactorSliderGrid(QtGui.QWidget):
         self.emit(QtCore.SIGNAL('valueChanged()'))
 
     def getValues(self):
-        return [factorSlider.slider.value() \
-                for factorSlider in self.factorSliders]
+        return dict([factorSlider.getValue() \
+                     for factorSlider in self.factorSliders])
 
 
 #--------------------------------------------------
@@ -129,10 +137,15 @@ class IIRSimCentralWidget(QtGui.QWidget):
     def __init__(self):
         QtGui.QWidget.__init__(self)
 
+        # read config, create filter and get names
+        cfgfile = 'directForm2.txt'
+        self.filt = iirsim_cfg.readconfig(cfgfile)
+        names = self.filt.factors().keys()
+        factor_bits = self.filt.factor_bits()
+        scale_bits = self.filt.scale_bits()
+
         # Factor Slider Array
-        names = ['b0', 'b1', 'b2', 'a1', 'a2']
-        factor_bits = 12
-        self.slider_grid = FactorSliderGrid(names, factor_bits)
+        self.slider_grid = FactorSliderGrid(names, factor_bits, scale_bits)
 
         # Global Layout
         globalVBox = QtGui.QVBoxLayout()
@@ -142,10 +155,13 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # signals
         self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
-                     self.printNewValues)
+                     self.printImpulseResponse)
 
-    def printNewValues(self):
-        print self.slider_grid.getValues()
+    def printImpulseResponse(self):
+        values = self.slider_grid.getValues()
+        for (name, value) in values.iteritems():
+            self.filt.set_factor(name, value)
+        print self.filt.impulse_response(10)
 
 class IIRSimMainWindow(QtGui.QMainWindow):
     def __init__(self):

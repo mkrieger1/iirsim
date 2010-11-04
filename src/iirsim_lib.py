@@ -57,6 +57,16 @@ def _test_overflow(x, N):
     B = 2**(N-1)
     return (x < -B) or (x > B-1)
 
+def _unit_pulse(bits, length):
+    """Return unit pulse as generator object."""
+    if bits < 2:
+        raise ValueError('number of bits must be at least 2')
+    if length < 1:
+        raise ValueError('length must be at least 1')
+    yield (1 << bits-1) - 1
+    for i in range(length-1):
+        yield 0
+
 # base class: _FilterComponent
 #--------------------------------------------------------------------
 class _FilterComponent():
@@ -211,7 +221,7 @@ class Multiply(_FilterComponent):
     def factor(self, scaled=False):
         """Return the factor."""
         if scaled:
-            return float(self._factor)/(2**self._scale_bits)
+            return float(self._factor)/(1 << self._scale_bits)
         else:
             return self._factor
 
@@ -274,6 +284,8 @@ class Filter():
         self._out_node = node_dict[out_node]
         self._delay_nodes = filter(lambda x: isinstance(x, Delay), \
                                   self._nodes.values())
+        self._mul_node_names = filter(lambda name: \
+            isinstance(self._nodes[name], Multiply), self._nodes.keys())
                # (builtin function 'filter' has nothing to do with IIR filters)
 
         for (name, node) in self._nodes.iteritems():
@@ -301,12 +313,28 @@ class Filter():
         self._in_node.set_value(input_value)
         return self._out_node.get_output()
 
+    def impulse_response(self, length):
+        """Return the impulse response of the filter."""
+        self.reset()
+        return [self.feed(x) for x in _unit_pulse(self._in_node._bits, length)]
+
     def factors(self, scaled=False):
-        """Return dictionary of Multiply nodes with their factors."""
-        mul_node_names = filter(lambda name: \
-            isinstance(self._nodes[name], Multiply), self._nodes.keys())
-        return dict(zip(mul_node_names, [self._nodes[name].factor(scaled) \
-                                         for name in mul_node_names]))
+        """Return names of the Multiply nodes with their factors."""
+        return dict(zip(self._mul_node_names, \
+                        [self._nodes[name].factor(scaled) \
+                         for name in self._mul_node_names]))
+
+    def factor_bits(self):
+        """Return names of the Multiply nodes with their factor_bits."""
+        return dict(zip(self._mul_node_names, \
+                        [self._nodes[name]._factor_bits \
+                         for name in self._mul_node_names]))
+
+    def scale_bits(self):
+        """Return names of the Multiply nodes with their scale_bits."""
+        return dict(zip(self._mul_node_names, \
+                        [self._nodes[name]._scale_bits \
+                         for name in self._mul_node_names]))
 
     def set_factor(self, name, factor, scaled=False):
         """Set the factor of a Multiply node."""

@@ -32,6 +32,6 @@ node Delay,    name "delay2", connect "delay1"
 node Multiply, name "b0",     connect "add1"
 node Multiply, name "b1",     connect "delay1"
 node Multiply, name "b2",     connect "delay2"
-node Multiply, name "a1",     connect "delay1" # ein kommentar
+node Multiply, name "a1",     connect "delay1"
 node Multiply, name "a2",     connect "delay2"
 

@@ -97,10 +97,12 @@ def readconfig(filename):
                 elif node == 'Multiply':
                     if 'factor_bits' in cfg_item:
                         [factor_bits] = cfg_item['factor_bits']
+                        factor_bits = int(factor_bits)
                     else:
                         factor_bits = factor_bits_global
                     if 'scale_bits' in cfg_item:
                         [scale_bits] = cfg_item['scale_bits']
+                        scale_bits = int(scale_bits)
                     else:
                         scale_bits = scale_bits_global
                     if (factor_bits is not None and scale_bits is not None):
