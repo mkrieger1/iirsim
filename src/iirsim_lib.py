@@ -57,13 +57,16 @@ def _test_overflow(x, N):
     B = 2**(N-1)
     return (x < -B) or (x > B-1)
 
-def _unit_pulse(bits, length):
+def _unit_pulse(bits, length, scaled=False):
     """Return unit pulse as generator object."""
-    if bits < 2:
-        raise ValueError('number of bits must be at least 2')
-    if length < 1:
-        raise ValueError('length must be at least 1')
-    yield (1 << bits-1) - 1
+    if scaled:
+        yield float((1 << bits-1) - 1) / (1 << bits-1)
+    else:
+        if bits < 2:
+            raise ValueError('number of bits must be at least 2')
+        if length < 1:
+            raise ValueError('length must be at least 1')
+        yield (1 << bits-1) - 1
     for i in range(length-1):
         yield 0
 
@@ -107,7 +110,7 @@ class _FilterComponent():
         else:
             self._input_nodes = input_nodes
 
-    def get_output(self):
+    def get_output(self, verbose=False):
         raise NotImplementedError
         # must be overridden by child class
 
@@ -146,9 +149,14 @@ class Const(_FilterComponent):
         except TypeError:
             raise
     
-    def get_output(self):
+    def get_output(self, verbose=False):
         """Return the stored value."""
-        return self._value
+        value = self._value
+        if verbose:
+            msg = 'returning %i' % value
+            return (value, msg)
+        else:
+            return value
 
 class Add(_FilterComponent):
     """Adds two integer values using binary two's complement arithmetic."""
@@ -160,14 +168,22 @@ class Add(_FilterComponent):
         except (TypeError, ValueError):
             raise
 
-    def get_output(self):
+    def get_output(self, verbose=False):
         """Return the sum of the input values using modular arithmetic."""
         try:
             input_values = self._get_input_values()
-            S = sum(input_values)
-            return _wrap(S, self._bits)
         except (RuntimeError, ValueError):
             raise
+        S = sum(input_values)
+        value = _wrap(S, self._bits)
+        if verbose:
+            if S != value:
+                msg = 'OVERFLOW: %i wrapped to %i' % (S, value)
+            else:
+                msg = 'returning %i' % value
+            return (value, msg)
+        else:
+            return value
 
 class Multiply(_FilterComponent):
     """Multiplies the input value by a constant factor."""
@@ -209,14 +225,22 @@ class Multiply(_FilterComponent):
         else:
             self._factor = factor
 
-    def get_output(self):
+    def get_output(self, verbose=False):
         """Return multiple of the input value using saturation arithmetic."""
         try:
             [input_value] = self._get_input_values()
-            P = (input_value*self._factor) >> self._scale_bits
-            return _saturate(P, self._bits)
         except (RuntimeError, ValueError):
             raise
+        P = (input_value*self._factor) >> self._scale_bits
+        value = _saturate(P, self._bits)
+        if verbose:
+            if P != value:
+                msg = 'OVERFLOW: %i saturated to %i' % (P, value)
+            else:
+                msg = 'returning %i' % value
+            return (value, msg)
+        else:
+            return value
 
     def factor(self, scaled=False):
         """Return the factor."""
@@ -252,9 +276,14 @@ class Delay(_FilterComponent):
         except (RuntimeError, ValueError):
             raise
 
-    def get_output(self):
+    def get_output(self, verbose=False):
         """Return current value."""
-        return self._value
+        value = self._value
+        if verbose:
+            msg = 'returning %i' % value
+            return (value, msg)
+        else:
+            return value
 
 class Filter():
     """This class makes a filter out of individual filter nodes."""
@@ -307,16 +336,29 @@ class Filter():
         for node in self._delay_nodes:
             node.reset()
 
-    def feed(self, input_value):
+    def feed(self, input_value, scaled=False):
         """Feed new input value into the filter and return output value."""
         self._update()
+        if scaled:
+            input_value = int(input_value * (1 << self._in_node._bits-1))
         self._in_node.set_value(input_value)
-        return self._out_node.get_output()
+        output_value = self._out_node.get_output()
+        if scaled:
+            output_value = float(output_value)/(1<<self._out_node._bits-1)
+        return output_value
 
-    def impulse_response(self, length):
+    def print_status(self):
+        names = self._nodes.keys()
+        maxlen = max([len(name) for name in names])
+        for name in names:
+            (value, msg) = self._nodes[name].get_output(verbose=True)
+            print name.ljust(maxlen), msg
+
+    def impulse_response(self, length, scaled=False):
         """Return the impulse response of the filter."""
         self.reset()
-        return [self.feed(x) for x in _unit_pulse(self._in_node._bits, length)]
+        return [self.feed(x, scaled) \
+                for x in _unit_pulse(self._in_node._bits, length, scaled)]
 
     def factors(self, scaled=False):
         """Return names of the Multiply nodes with their factors."""

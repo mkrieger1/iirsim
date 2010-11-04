@@ -161,7 +161,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         values = self.slider_grid.getValues()
         for (name, value) in values.iteritems():
             self.filt.set_factor(name, value)
-        print self.filt.impulse_response(10)
+        print self.filt.impulse_response(10, scaled=True)
 
 class IIRSimMainWindow(QtGui.QMainWindow):
     def __init__(self):
