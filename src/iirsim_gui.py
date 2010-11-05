@@ -1,5 +1,5 @@
-import os
-from PyQt4 import QtCore, QtGui
+import os, numpy
+from PyQt4 import QtCore, QtGui, Qwt5
 
 import iirsim_cfg
 
@@ -128,9 +128,27 @@ class FactorSliderGrid(QtGui.QWidget):
         return dict([factorSlider.getValue() \
                      for factorSlider in self.factorSliders])
 
+class PlotWindow(Qwt5.QwtPlot):
+    def __init__(self, title):
+        Qwt5.QwtPlot.__init__(self)
+        self.setMinimumWidth(300)
+        self.setMinimumHeight(200)
+        self.setCanvasBackground(QtGui.QColor(QtCore.Qt.white))
+        self.setCanvasLineWidth(1)
+        self.setTitle(title)
+        self.setAxisScale(Qwt5.QwtPlot.yLeft, -1, 1)
+        self.setAutoReplot(True)
+
+        self.curve = Qwt5.QwtPlotCurve()
+        self.curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
+        self.curve.attach(self)
+
+    def plotData(self, x, y):
+        self.curve.setData(x, y)
+
 
 #--------------------------------------------------
-# Top Level ab hier
+# Central Widget
 #--------------------------------------------------
 
 class IIRSimCentralWidget(QtGui.QWidget):
@@ -146,22 +164,58 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # Factor Slider Array
         self.slider_grid = FactorSliderGrid(names, factor_bits, scale_bits)
+        slider_layout = QtGui.QVBoxLayout()
+        slider_layout.addWidget(self.slider_grid)
+        slider_groupbox = QtGui.QGroupBox('Factors')
+        slider_groupbox.setLayout(slider_layout)
+
+        # Plot Options
+        self.impulse_length_edit = QtGui.QLineEdit()
+        self.impulse_length_edit.setText('32')
+        self.impulse_length_edit.setValidator(QtGui.QIntValidator())
+        plot_options_layout = QtGui.QGridLayout()
+        plot_options_layout.addWidget(QtGui.QLabel('Length'), 0, 0)
+        plot_options_layout.addWidget(self.impulse_length_edit, 0, 1)
+        plot_options_groupbox = QtGui.QGroupBox('Plot Options')
+        plot_options_groupbox.setLayout(plot_options_layout)
+
+        # Plot Window
+        self.impulse_response_plot = PlotWindow('Impulse Response')
 
         # Global Layout
-        globalVBox = QtGui.QVBoxLayout()
-        globalVBox.addWidget(self.slider_grid)
-        globalVBox.addStretch()
-        self.setLayout(globalVBox)
+        controlVBox = QtGui.QVBoxLayout()
+        controlVBox.addWidget(slider_groupbox, 0)
+        controlVBox.addWidget(plot_options_groupbox, 0)
+        controlVBox.addStretch(1)
+
+        globalHBox = QtGui.QHBoxLayout()
+        globalHBox.addLayout(controlVBox, 1)
+        globalHBox.addStretch(0)
+        globalHBox.addWidget(self.impulse_response_plot, 2)
+        self.setLayout(globalHBox)
 
         # signals
         self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
-                     self.printImpulseResponse)
+                     self.updatePlot)
+        self.connect(self.impulse_length_edit, \
+                     QtCore.SIGNAL('editingFinished()'), \
+                     self.updatePlot)
 
-    def printImpulseResponse(self):
+        self.updatePlot()
+
+    def updatePlot(self):
+        length = int(self.impulse_length_edit.text())
+        self.impulse_response_plot.setAxisScale(Qwt5.QwtPlot.xBottom, 0, length)
         values = self.slider_grid.getValues()
         for (name, value) in values.iteritems():
             self.filt.set_factor(name, value)
-        print self.filt.impulse_response(10, scaled=True)
+        x = numpy.array(range(length+1))
+        y = numpy.array(self.filt.impulse_response(length+1, scaled=True))
+        self.impulse_response_plot.plotData(x, y)
+
+#--------------------------------------------------
+# Main Window
+#--------------------------------------------------
 
 class IIRSimMainWindow(QtGui.QMainWindow):
     def __init__(self):
