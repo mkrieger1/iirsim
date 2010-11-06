@@ -136,12 +136,15 @@ class PlotWindow(Qwt5.QwtPlot):
         self.setCanvasBackground(QtGui.QColor(QtCore.Qt.white))
         self.setCanvasLineWidth(1)
         self.setTitle(title)
-        self.setAxisScale(Qwt5.QwtPlot.yLeft, -1, 1)
         self.setAutoReplot(True)
 
         self.curve = Qwt5.QwtPlotCurve()
         self.curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
         self.curve.attach(self)
+
+        self.grid = Qwt5.QwtPlotGrid()
+        self.grid.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0, alpha=32)))
+        self.grid.attach(self)
 
     def plotData(self, x, y):
         self.curve.setData(x, y)
@@ -179,8 +182,20 @@ class IIRSimCentralWidget(QtGui.QWidget):
         plot_options_groupbox = QtGui.QGroupBox('Plot Options')
         plot_options_groupbox.setLayout(plot_options_layout)
 
-        # Plot Window
-        self.impulse_response_plot = PlotWindow('Impulse Response')
+        # Plot Windows
+        self.impulse_plot = PlotWindow('Impulse Response')
+        self.impulse_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -1, 1)
+        self.frequency_plot = PlotWindow('Frequency Response')
+        self.frequency_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -96, 30)
+        self.frequency_plot.setAxisScale(Qwt5.QwtPlot.xBottom, \
+                                         1e-3, 1)
+        self.frequency_plot.setAxisScaleEngine(Qwt5.QwtPlot.xBottom, \
+                                           Qwt5.QwtLog10ScaleEngine())
+        self.frequency_plot.setAxisTitle(Qwt5.QwtPlot.xBottom, \
+                                         'f [fs/2]')
+        self.frequency_plot.setAxisTitle(Qwt5.QwtPlot.yLeft, \
+                                         'dB')
+
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
@@ -188,10 +203,14 @@ class IIRSimCentralWidget(QtGui.QWidget):
         controlVBox.addWidget(plot_options_groupbox, 0)
         controlVBox.addStretch(1)
 
+        plotVBox = QtGui.QVBoxLayout()
+        plotVBox.addWidget(self.impulse_plot)
+        plotVBox.addWidget(self.frequency_plot)
+
         globalHBox = QtGui.QHBoxLayout()
         globalHBox.addLayout(controlVBox, 1)
         globalHBox.addStretch(0)
-        globalHBox.addWidget(self.impulse_response_plot, 2)
+        globalHBox.addLayout(plotVBox, 2)
         self.setLayout(globalHBox)
 
         # signals
@@ -205,13 +224,16 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
     def updatePlot(self):
         length = int(self.impulse_length_edit.text())
-        self.impulse_response_plot.setAxisScale(Qwt5.QwtPlot.xBottom, 0, length)
+        self.impulse_plot.setAxisScale(Qwt5.QwtPlot.xBottom, 0, length)
         values = self.slider_grid.getValues()
         for (name, value) in values.iteritems():
             self.filt.set_factor(name, value)
         x = numpy.array(range(length+1))
+        f = numpy.arange(0, 1, 2.0/length)
         y = numpy.array(self.filt.impulse_response(length+1, scaled=True))
-        self.impulse_response_plot.plotData(x, y)
+        Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y))[0:length/2+1])
+        self.impulse_plot.plotData(x, y)
+        self.frequency_plot.plotData(f, Y)
 
 #--------------------------------------------------
 # Main Window
