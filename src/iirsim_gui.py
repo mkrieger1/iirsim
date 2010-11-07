@@ -186,7 +186,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.impulse_plot = PlotWindow('Impulse Response')
         self.impulse_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -1, 1)
         self.frequency_plot = PlotWindow('Frequency Response')
-        self.frequency_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -96, 30)
+        self.frequency_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -30, 30)
         self.frequency_plot.setAxisScale(Qwt5.QwtPlot.xBottom, \
                                          1e-3, 1)
         self.frequency_plot.setAxisScaleEngine(Qwt5.QwtPlot.xBottom, \
