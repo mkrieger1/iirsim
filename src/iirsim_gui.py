@@ -20,7 +20,7 @@ class QSlider_autoticks(QtGui.QSlider):
 
 class FactorSlider(QtGui.QWidget):
     """A slider with name and value label and a spin box."""
-    def __init__(self, name, factor_bits, scale_bits=None):
+    def __init__(self, name, factor_bits, scale_bits=None, factor=None):
         QtGui.QWidget.__init__(self)
 
         if scale_bits is None:
@@ -36,7 +36,6 @@ class FactorSlider(QtGui.QWidget):
         self.slider = QSlider_autoticks(QtCore.Qt.Horizontal, 10)
         self.slider.setRange(-2**(factor_bits-1), 2**(factor_bits-1)-1)
         self.slider.setPageStep(max(1, 2**(factor_bits-3)))
-        self.slider.setValue(0)
 
         # value label
         self.valueLabel = QtGui.QLabel()
@@ -63,8 +62,13 @@ class FactorSlider(QtGui.QWidget):
                      self._signalValueChanged)
 
         # set initial value
+        if factor is not None:
+            self.slider.setValue(factor)
+        else:
+            self.slider.setValue(0)
+        #self._updateSpinBox()
         self._updateLabel()
-        self._signalValueChanged()
+        #self._signalValueChanged()
 
     def _valueLabelText(self, value=None, scale=None):
         if value is None:
@@ -86,7 +90,7 @@ class FactorSlider(QtGui.QWidget):
     def _signalValueChanged(self):
         self.emit(QtCore.SIGNAL('valueChanged()'))
 
-    def getMinLabelWidth(self):
+    def _getMinLabelWidth(self):
         label = QtGui.QLabel()
         value = -2**(self.factor_bits-1)
         text = self._valueLabelText(value)
@@ -100,23 +104,23 @@ class FactorSlider(QtGui.QWidget):
 
 class FactorSliderGrid(QtGui.QWidget):
     """A group of FactorSliders aligned in a grid."""
-    def __init__(self, names, factor_bits, scale_bits=None):
+    def __init__(self, factor_dict, factor_bits, scale_bits=None):
         QtGui.QWidget.__init__(self)
 
-        self.factorSliders = [FactorSlider( \
-                              name, factor_bits[name], scale_bits[name]) \
-                              for name in names]
+        self.factorSliders = dict(zip(factor_dict.keys(), \
+            [FactorSlider(name, factor_bits[name], scale_bits[name], factor) \
+                          for (name, factor) in factor_dict.iteritems()]))
 
         gridLayout = QtGui.QGridLayout()
-        for (row, factorSlider) in enumerate(self.factorSliders):
+        for (row, factorSlider) in enumerate(self.factorSliders.itervalues()):
             gridLayout.addWidget(factorSlider.nameLabel,  row, 0)
             gridLayout.addWidget(factorSlider.slider,     row, 1)
             gridLayout.addWidget(factorSlider.valueLabel, row, 2)
             gridLayout.addWidget(factorSlider.spinBox,    row, 3)
             self.connect(factorSlider, QtCore.SIGNAL('valueChanged()'), \
                          self._signalValueChanged)
-        minLabelWidth = max([slider.getMinLabelWidth() \
-                             for slider in self.factorSliders])
+        minLabelWidth = max([slider._getMinLabelWidth() \
+                             for slider in self.factorSliders.itervalues()])
         gridLayout.setColumnMinimumWidth(1, 50)
         gridLayout.setColumnMinimumWidth(2, minLabelWidth)
         self.setLayout(gridLayout)
@@ -125,10 +129,10 @@ class FactorSliderGrid(QtGui.QWidget):
         self.emit(QtCore.SIGNAL('valueChanged()'))
 
     def getValues(self):
-        return dict([factorSlider.getValue() \
-                     for factorSlider in self.factorSliders])
+        return dict([self.factorSliders[name].getValue() \
+                     for name in self.factorSliders.iterkeys()])
 
-class PlotWindow(Qwt5.QwtPlot):
+class Plot(Qwt5.QwtPlot):
     def __init__(self, title):
         Qwt5.QwtPlot.__init__(self)
         self.setMinimumWidth(300)
@@ -161,40 +165,50 @@ class IIRSimCentralWidget(QtGui.QWidget):
         # read config, create filter and get names
         cfgfile = 'directForm2.txt'
         self.filt = iirsim_cfg.readconfig(cfgfile)
-        names = self.filt.factors().keys()
+        factor_dict = self.filt.factors()
         factor_bits = self.filt.factor_bits()
         scale_bits = self.filt.scale_bits()
 
         # Factor Slider Array
-        self.slider_grid = FactorSliderGrid(names, factor_bits, scale_bits)
+        self.slider_grid = FactorSliderGrid( \
+            factor_dict, factor_bits, scale_bits)
         slider_layout = QtGui.QVBoxLayout()
         slider_layout.addWidget(self.slider_grid)
-        slider_groupbox = QtGui.QGroupBox('Factors')
+        slider_groupbox = QtGui.QGroupBox('Filter coefficients')
         slider_groupbox.setLayout(slider_layout)
 
         # Plot Options
-        self.impulse_length_edit = QtGui.QLineEdit()
-        self.impulse_length_edit.setText('32')
-        self.impulse_length_edit.setValidator(QtGui.QIntValidator())
+        self.num_samples_edit = QtGui.QLineEdit()
+        self.num_samples_edit.setText('32')
+        self.num_samples_edit.setValidator(QtGui.QIntValidator())
+        self.num_samples_edit.setAlignment( \
+            QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+        self.sample_rate_edit = QtGui.QLineEdit()
+        self.sample_rate_edit.setText('50000')
+        self.sample_rate_edit.setValidator(QtGui.QDoubleValidator(None))
+        self.sample_rate_edit.setAlignment( \
+            QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
         plot_options_layout = QtGui.QGridLayout()
-        plot_options_layout.addWidget(QtGui.QLabel('Length'), 0, 0)
-        plot_options_layout.addWidget(self.impulse_length_edit, 0, 1)
+        plot_options_layout.addWidget(QtGui.QLabel('Samples'),     0, 0)
+        plot_options_layout.addWidget(self.num_samples_edit,       0, 1)
+        plot_options_layout.addWidget(QtGui.QLabel('Sample rate'), 1, 0)
+        plot_options_layout.addWidget(QtGui.QLabel('Hz'),          1, 2)
+        plot_options_layout.addWidget(self.sample_rate_edit,       1, 1)
         plot_options_groupbox = QtGui.QGroupBox('Plot Options')
         plot_options_groupbox.setLayout(plot_options_layout)
 
         # Plot Windows
-        self.impulse_plot = PlotWindow('Impulse Response')
-        self.impulse_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -1, 1)
-        self.frequency_plot = PlotWindow('Frequency Response')
-        self.frequency_plot.setAxisScale(Qwt5.QwtPlot.yLeft, -30, 30)
-        self.frequency_plot.setAxisScale(Qwt5.QwtPlot.xBottom, \
-                                         1e-3, 1)
-        self.frequency_plot.setAxisScaleEngine(Qwt5.QwtPlot.xBottom, \
-                                           Qwt5.QwtLog10ScaleEngine())
-        self.frequency_plot.setAxisTitle(Qwt5.QwtPlot.xBottom, \
-                                         'f [fs/2]')
-        self.frequency_plot.setAxisTitle(Qwt5.QwtPlot.yLeft, \
-                                         'dB')
+        xaxis = Qwt5.QwtPlot.xBottom
+        yaxis = Qwt5.QwtPlot.yLeft
+        self.impulse_plot = Plot('Impulse Response')
+        self.impulse_plot.setAxisScale(yaxis, -1, 1)
+        self.impulse_plot.setAxisTitle(yaxis, 'Amplitude')
+        self.frequency_plot = Plot('Frequency Response')
+        self.frequency_plot.setAxisScale(yaxis, -30, 30)
+        self.frequency_plot.setAxisScaleEngine(xaxis, \
+                                Qwt5.QwtLog10ScaleEngine())
+        self.frequency_plot.setAxisTitle(xaxis, 'Frequency / Hz')
+        self.frequency_plot.setAxisTitle(yaxis, 'Gain / dB')
 
 
         # Global Layout
@@ -204,8 +218,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
         controlVBox.addStretch(1)
 
         plotVBox = QtGui.QVBoxLayout()
-        plotVBox.addWidget(self.impulse_plot)
-        plotVBox.addWidget(self.frequency_plot)
+        plotVBox.addWidget(self.impulse_plot, 1)
+        plotVBox.addWidget(self.frequency_plot, 1)
 
         globalHBox = QtGui.QHBoxLayout()
         globalHBox.addLayout(controlVBox, 1)
@@ -216,23 +230,44 @@ class IIRSimCentralWidget(QtGui.QWidget):
         # signals
         self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
                      self.updatePlot)
-        self.connect(self.impulse_length_edit, \
+        self.connect(self.num_samples_edit, \
+                     QtCore.SIGNAL('editingFinished()'), \
+                     self.updatePlot)
+        self.connect(self.sample_rate_edit, \
                      QtCore.SIGNAL('editingFinished()'), \
                      self.updatePlot)
 
         self.updatePlot()
 
     def updatePlot(self):
-        length = int(self.impulse_length_edit.text())
-        self.impulse_plot.setAxisScale(Qwt5.QwtPlot.xBottom, 0, length)
-        values = self.slider_grid.getValues()
-        for (name, value) in values.iteritems():
+        length = int(self.num_samples_edit.text())
+        fs = float(self.sample_rate_edit.text())
+        axis = Qwt5.QwtPlot.xBottom
+        duration = length/fs
+        prefix = ''
+        if 10*duration < 1:
+            duration = 1000*duration
+            prefix = 'm'
+        if 10*duration < 1:
+            duration = 1000*duration
+            prefix = 'u'
+        if 10*duration < 1:
+            duration = 1000*duration
+            prefix = 'n'
+        self.impulse_plot.setAxisScale(axis, 0, duration)
+        self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
+        self.frequency_plot.setAxisScale(axis, fs/1000, fs)
+
+        coefficients = self.slider_grid.getValues()
+        for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
-        x = numpy.array(range(length+1))
-        f = numpy.arange(0, 1, 2.0/length)
+
+        t = numpy.arange(0, duration, duration/length)
         y = numpy.array(self.filt.impulse_response(length+1, scaled=True))
+        self.impulse_plot.plotData(t, y)
+
+        f = numpy.arange(0, fs, fs/(length/2))
         Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y))[0:length/2+1])
-        self.impulse_plot.plotData(x, y)
         self.frequency_plot.plotData(f, Y)
 
 #--------------------------------------------------

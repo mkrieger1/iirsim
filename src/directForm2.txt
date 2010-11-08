@@ -29,7 +29,7 @@ node Add,      name "add3",   connect "a1" "a2"
 node Add,      name "add4",   connect "b1" "b2"
 node Delay,    name "delay1", connect "add1"
 node Delay,    name "delay2", connect "delay1"
-node Multiply, name "b0",     connect "add1"
+node Multiply, name "b0",     connect "add1",        factor 1
 node Multiply, name "b1",     connect "delay1"
 node Multiply, name "b2",     connect "delay2"
 node Multiply, name "a1",     connect "delay1"

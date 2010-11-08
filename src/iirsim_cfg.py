@@ -9,6 +9,7 @@ def readconfig(filename):
         for line in f:
             # remove all comments and unnecessary whitespace
             normalizer = shlex.shlex(line)
+            normalizer.wordchars += '.'
             normal_line = ' '.join([t for t in normalizer])
             if normal_line:
                 # split up normalized line and build dictionary
@@ -108,6 +109,10 @@ def readconfig(filename):
                     if (factor_bits is not None and scale_bits is not None):
                         filter_nodes[name] = iirsim_lib.Multiply( \
                                              bits, factor_bits, scale_bits)
+                    if 'factor' in cfg_item:
+                        [factor] = cfg_item['factor']
+                        factor = float(factor)
+                        filter_nodes[name].set_factor(factor, scaled=True)
                 else:
                     raise ValueError('Unknown node type: %s' % node)
             else:
@@ -123,8 +128,8 @@ def readconfig(filename):
     elif output_node is None:
         raise RuntimeError('No output node specified.')
     else:
-        return iirsim_lib.Filter(filter_nodes, adjacency, input_node, \
-                                 output_node)
+        return iirsim_lib.Filter(filter_nodes, adjacency, \
+                                 input_node, output_node)
 
 if __name__=='__main__':
     readconfig('directForm2.txt')
