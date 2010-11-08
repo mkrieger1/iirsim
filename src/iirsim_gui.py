@@ -3,6 +3,7 @@ from PyQt4 import QtCore, QtGui, Qwt5
 
 import iirsim_cfg
 
+
 #--------------------------------------------------
 # Filter coefficient sliders
 #--------------------------------------------------
@@ -70,9 +71,7 @@ class FactorSlider(QtGui.QWidget):
             self.slider.setValue(factor)
         else:
             self.slider.setValue(0)
-        #self._updateSpinBox()
         self._updateLabel()
-        #self._signalValueChanged()
 
     def _valueLabelText(self, value=None, scale=None):
         if value is None:
@@ -136,13 +135,36 @@ class FactorSliderGrid(QtGui.QWidget):
         return dict([self.factorSliders[name].getValue() \
                      for name in self.factorSliders.iterkeys()])
 
+
 #--------------------------------------------------
 # Plot options
 #--------------------------------------------------
 
+class floatValidator(QtGui.QDoubleValidator):
+    def __init__(self, float_min, float_max, parent):
+        QtGui.QDoubleValidator.__init__(self, parent)
+        self.setRange(float_min, float_max)
+        self.parent = parent
+
+    def fixup(self, string):
+        d = float(string)
+        if d < self.bottom():
+            d = self.bottom()
+        elif d > self.top():
+            d = self.top()
+        self.parent.setText(str(d))
+        self.parent.emit(QtCore.SIGNAL('editingFinished()'))
+
+class floatEdit(QtGui.QLineEdit):
+    def __init__(self, float_min, float_max):
+        QtGui.QLineEdit.__init__(self)
+        self.validator = floatValidator(float_min, float_max, self)
+        self.setValidator(self.validator)
+        self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+
 class intValidator(QtGui.QIntValidator):
     def __init__(self, int_min, int_max, parent):
-        QtGui.QIntValidator.__init__(self)
+        QtGui.QIntValidator.__init__(self, parent)
         self.setRange(int_min, int_max)
         self.parent = parent
 
@@ -161,6 +183,40 @@ class intEdit(QtGui.QLineEdit):
         self.validator = intValidator(int_min, int_max, self)
         self.setValidator(self.validator)
         self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+
+class plotOptions(QtGui.QWidget):
+    def __init__(self):
+        QtGui.QWidget.__init__(self)
+        self.num_samples_edit = intEdit(8, 8192)
+        self.num_samples_edit.setText('32')
+        self.sample_rate_edit = floatEdit(1, 1e12)
+        self.sample_rate_edit.setText('50000')
+        grid = QtGui.QGridLayout()
+        grid.addWidget(QtGui.QLabel('Samples'),     0, 0)
+        grid.addWidget(self.num_samples_edit,       0, 1)
+        grid.addWidget(QtGui.QLabel('Sample rate'), 1, 0)
+        grid.addWidget(QtGui.QLabel('Hz'),          1, 2)
+        grid.addWidget(self.sample_rate_edit,       1, 1)
+        self.setLayout(grid)
+
+        self.connect(self.num_samples_edit, \
+                     QtCore.SIGNAL('editingFinished()'), \
+                     self._signalEditingFinished)
+            
+        self.connect(self.sample_rate_edit, \
+                     QtCore.SIGNAL('editingFinished()'), \
+                     self._signalEditingFinished)
+
+    def _signalEditingFinished(self):
+        self.emit(QtCore.SIGNAL('editingFinished()'))
+
+    def get_options(self):
+        num_samples = int(self.num_samples_edit.text())
+        sample_rate = float(self.sample_rate_edit.text())
+        return dict([ \
+            ['num_samples', num_samples], \
+            ['sample_rate', sample_rate] ])
+
 
 #--------------------------------------------------
 # Plot area
@@ -206,27 +262,13 @@ class IIRSimCentralWidget(QtGui.QWidget):
         # Factor Slider Array
         self.slider_grid = FactorSliderGrid( \
             factor_dict, factor_bits, scale_bits)
-        slider_layout = QtGui.QVBoxLayout()
-        slider_layout.addWidget(self.slider_grid)
         slider_groupbox = QtGui.QGroupBox('Filter coefficients')
-        slider_groupbox.setLayout(slider_layout)
+        slider_groupbox.setLayout(self.slider_grid.layout())
 
         # Plot Options
-        self.num_samples_edit = intEdit(8, 8192)
-        self.num_samples_edit.setText('32')
-        self.sample_rate_edit = QtGui.QLineEdit()
-        self.sample_rate_edit.setText('50000')
-        self.sample_rate_edit.setValidator(QtGui.QDoubleValidator(None))
-        self.sample_rate_edit.setAlignment( \
-            QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
-        plot_options_layout = QtGui.QGridLayout()
-        plot_options_layout.addWidget(QtGui.QLabel('Samples'),     0, 0)
-        plot_options_layout.addWidget(self.num_samples_edit,       0, 1)
-        plot_options_layout.addWidget(QtGui.QLabel('Sample rate'), 1, 0)
-        plot_options_layout.addWidget(QtGui.QLabel('Hz'),          1, 2)
-        plot_options_layout.addWidget(self.sample_rate_edit,       1, 1)
+        self.plot_options = plotOptions()
         plot_options_groupbox = QtGui.QGroupBox('Plot Options')
-        plot_options_groupbox.setLayout(plot_options_layout)
+        plot_options_groupbox.setLayout(self.plot_options.layout())
 
         # Plot Windows
         xaxis = Qwt5.QwtPlot.xBottom
@@ -240,7 +282,6 @@ class IIRSimCentralWidget(QtGui.QWidget):
                                 Qwt5.QwtLog10ScaleEngine())
         self.frequency_plot.setAxisTitle(xaxis, 'Frequency / Hz')
         self.frequency_plot.setAxisTitle(yaxis, 'Gain / dB')
-
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
@@ -261,18 +302,15 @@ class IIRSimCentralWidget(QtGui.QWidget):
         # signals
         self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
                      self.updatePlot)
-        self.connect(self.num_samples_edit, \
-                     QtCore.SIGNAL('editingFinished()'), \
-                     self.updatePlot)
-        self.connect(self.sample_rate_edit, \
-                     QtCore.SIGNAL('editingFinished()'), \
+        self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
                      self.updatePlot)
 
         self.updatePlot()
 
     def updatePlot(self):
-        length = int(self.num_samples_edit.text())
-        fs = float(self.sample_rate_edit.text())
+        options = self.plot_options.get_options()
+        length = options['num_samples']
+        fs = options['sample_rate']
         axis = Qwt5.QwtPlot.xBottom
         duration = length/fs
         prefix = ''
@@ -301,6 +339,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         f = numpy.linspace(0, fs, fftlen)
         Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
         self.frequency_plot.plotData(f, Y)
+
 
 #--------------------------------------------------
 # Main Window
