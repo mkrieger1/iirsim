@@ -189,6 +189,7 @@ class plotOptions(QtGui.QWidget):
         QtGui.QWidget.__init__(self)
         self.num_samples_edit = intEdit(8, 8192)
         self.num_samples_edit.setText('32')
+        self.time_checkbox = QtGui.QCheckBox('Show time instead of samples')
         self.sample_rate_edit = floatEdit(1, 1e12)
         self.sample_rate_edit.setText('50000')
         grid = QtGui.QGridLayout()
@@ -197,6 +198,7 @@ class plotOptions(QtGui.QWidget):
         grid.addWidget(QtGui.QLabel('Sample rate'), 1, 0)
         grid.addWidget(QtGui.QLabel('Hz'),          1, 2)
         grid.addWidget(self.sample_rate_edit,       1, 1)
+        grid.addWidget(self.time_checkbox,          2, 0, 1, 2)
         self.setLayout(grid)
 
         self.connect(self.num_samples_edit, \
@@ -207,15 +209,21 @@ class plotOptions(QtGui.QWidget):
                      QtCore.SIGNAL('editingFinished()'), \
                      self._signalEditingFinished)
 
+        self.connect(self.time_checkbox, \
+                     QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalEditingFinished)
+
     def _signalEditingFinished(self):
         self.emit(QtCore.SIGNAL('editingFinished()'))
 
     def get_options(self):
         num_samples = int(self.num_samples_edit.text())
         sample_rate = float(self.sample_rate_edit.text())
+        time_checked = self.time_checkbox.isChecked()
         return dict([ \
             ['num_samples', num_samples], \
-            ['sample_rate', sample_rate] ])
+            ['sample_rate', sample_rate], \
+            ['time_checked', time_checked] ])
 
 
 #--------------------------------------------------
@@ -311,33 +319,44 @@ class IIRSimCentralWidget(QtGui.QWidget):
         options = self.plot_options.get_options()
         length = options['num_samples']
         fs = options['sample_rate']
+        time = options['time_checked']
+        duration = (length-1)/fs
         axis = Qwt5.QwtPlot.xBottom
-        duration = length/fs
-        prefix = ''
-        if 10*duration < 1:
-            duration = 1000*duration
-            prefix = 'm'
-        if 10*duration < 1:
-            duration = 1000*duration
-            prefix = 'u'
-        if 10*duration < 1:
-            duration = 1000*duration
-            prefix = 'n'
-        self.impulse_plot.setAxisScale(axis, 0, duration)
-        self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
-        self.frequency_plot.setAxisScale(axis, fs/1000, fs)
+        if time:
+            prefix = ''
+            if 10*duration < 1:
+                duration = 1000*duration
+                prefix = 'm'
+            if 10*duration < 1:
+                duration = 1000*duration
+                prefix = 'u'
+            if 10*duration < 1:
+                duration = 1000*duration
+                prefix = 'n'
+            self.impulse_plot.setAxisScale(axis, 0, duration)
+            self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
+        else:
+            self.impulse_plot.setAxisScale(axis, 0, length-1)
+            self.impulse_plot.setAxisTitle(axis,'Samples')
 
         coefficients = self.slider_grid.getValues()
         for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
 
-        t = numpy.linspace(0, duration, length)
+        t = numpy.arange(length)
+        if time:
+            t = t*duration/(length-1)
         y = numpy.array(self.filt.impulse_response(length, scaled=True))
         self.impulse_plot.plotData(t, y)
 
         fftlen = (length+1)/2
-        f = numpy.linspace(0, fs, fftlen)
+        min_gain = -96 # TODO
+        f = numpy.linspace(0, fs/2, fftlen)
         Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
+        for i in range(fftlen):
+            if Y[i] == -numpy.Inf:
+                Y[i] = min_gain
+        self.frequency_plot.setAxisScale(axis, fs/2000, fs/2)
         self.frequency_plot.plotData(f, Y)
 
 

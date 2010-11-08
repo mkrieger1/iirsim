@@ -18,7 +18,7 @@
 # y[n] = a1 y[n-1] + a2 y[n-2] + b0 x[n] + b1 x[n-1] + b2 x[n-2]
 
 
-bits_global        10
+bits_global        32
 factor_bits_global  9
 scale_bits_global   7
 

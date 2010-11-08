@@ -21,13 +21,16 @@ get_output() -- Return the output value by either calling get_output() of the
 
 # internally used functions
 #--------------------------------------------------------------------
+def _test_int(x):
+    return (isinstance(x, int) or isinstance(x, long))
+    
 def _wrap(x, N):
     """Reduce integer x to N bits, wrapping in case of overflow.
    
     With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
     For -B <= x < B, x remains unchanged.
     """
-    if not isinstance(x, int):
+    if not _test_int(x):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return ((x+B) % 2**N) - B
@@ -40,7 +43,7 @@ def _saturate(x, N):
     -B  is returned for x < -B,
     for -B <= x < B, x remains unchanged.
     """
-    if not isinstance(x, int):
+    if not _test_int(x):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     if x < -B:
@@ -52,7 +55,7 @@ def _saturate(x, N):
 
 def _test_overflow(x, N):
     """Test if integer x can be represented as N bit two's complement number."""
-    if not isinstance(x, int):
+    if not _test_int(x):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return (x < -B) or (x > B-1)
@@ -77,11 +80,11 @@ class _FilterComponent():
 
     # internally used methods
     def __init__(self, ninputs, bits):
-        if not isinstance(ninputs, int):
+        if not _test_int(ninputs):
             raise TypeError("number of inputs must be 'int'")
         elif ninputs < 0:
             raise ValueError("number of inputs must not be negative")
-        elif not isinstance(bits, int):
+        elif not _test_int(bits):
             raise TypeError("number of bits must be 'int'")
         elif bits < 1:
             raise ValueError("number of bits must be positive")
@@ -194,14 +197,14 @@ class Multiply(_FilterComponent):
         except (TypeError, ValueError):
             raise
 
-        if not isinstance(factor_bits, int):
+        if not _test_int(factor_bits):
             raise TypeError("factor_bits must be 'int'")
         elif factor_bits < 2:
             raise ValueError("factor_bits must be at least 2")
         else:
             self._factor_bits = factor_bits
 
-        if not isinstance(scale_bits, int):
+        if not _test_int(scale_bits):
             raise TypeError("scale_bits must be 'int'")
         elif scale_bits < 0:
             raise ValueError("scale_bits must not be negative")
