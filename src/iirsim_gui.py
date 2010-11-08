@@ -3,6 +3,10 @@ from PyQt4 import QtCore, QtGui, Qwt5
 
 import iirsim_cfg
 
+#--------------------------------------------------
+# Filter coefficient sliders
+#--------------------------------------------------
+
 class QSlider_autoticks(QtGui.QSlider):
     """A slider with self adjusting tick marks."""
     def __init__(self, orientation, tick_min_distance):
@@ -132,6 +136,36 @@ class FactorSliderGrid(QtGui.QWidget):
         return dict([self.factorSliders[name].getValue() \
                      for name in self.factorSliders.iterkeys()])
 
+#--------------------------------------------------
+# Plot options
+#--------------------------------------------------
+
+class intValidator(QtGui.QIntValidator):
+    def __init__(self, int_min, int_max, parent):
+        QtGui.QIntValidator.__init__(self)
+        self.setRange(int_min, int_max)
+        self.parent = parent
+
+    def fixup(self, string):
+        i = int(string)
+        if i < self.bottom():
+            i = self.bottom()
+        elif i > self.top():
+            i = self.top()
+        self.parent.setText(str(i))
+        self.parent.emit(QtCore.SIGNAL('editingFinished()'))
+
+class intEdit(QtGui.QLineEdit):
+    def __init__(self, int_min, int_max):
+        QtGui.QLineEdit.__init__(self)
+        self.validator = intValidator(int_min, int_max, self)
+        self.setValidator(self.validator)
+        self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+
+#--------------------------------------------------
+# Plot area
+#--------------------------------------------------
+
 class Plot(Qwt5.QwtPlot):
     def __init__(self, title):
         Qwt5.QwtPlot.__init__(self)
@@ -178,11 +212,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
         slider_groupbox.setLayout(slider_layout)
 
         # Plot Options
-        self.num_samples_edit = QtGui.QLineEdit()
+        self.num_samples_edit = intEdit(8, 8192)
         self.num_samples_edit.setText('32')
-        self.num_samples_edit.setValidator(QtGui.QIntValidator())
-        self.num_samples_edit.setAlignment( \
-            QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
         self.sample_rate_edit = QtGui.QLineEdit()
         self.sample_rate_edit.setText('50000')
         self.sample_rate_edit.setValidator(QtGui.QDoubleValidator(None))
@@ -262,12 +293,13 @@ class IIRSimCentralWidget(QtGui.QWidget):
         for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
 
-        t = numpy.arange(0, duration, duration/length)
-        y = numpy.array(self.filt.impulse_response(length+1, scaled=True))
+        t = numpy.linspace(0, duration, length)
+        y = numpy.array(self.filt.impulse_response(length, scaled=True))
         self.impulse_plot.plotData(t, y)
 
-        f = numpy.arange(0, fs, fs/(length/2))
-        Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y))[0:length/2+1])
+        fftlen = (length+1)/2
+        f = numpy.linspace(0, fs, fftlen)
+        Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
         self.frequency_plot.plotData(f, Y)
 
 #--------------------------------------------------
