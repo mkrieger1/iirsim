@@ -239,7 +239,6 @@ class Plot(Qwt5.QwtPlot):
         self.setCanvasBackground(QtGui.QColor(QtCore.Qt.white))
         self.setCanvasLineWidth(1)
         self.setTitle(title)
-        self.setAutoReplot(True)
 
         self.curve = Qwt5.QwtPlotCurve()
         self.curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
@@ -310,6 +309,9 @@ class FilterResponsePlot(QtGui.QWidget):
                 Y[i] = min_gain
         self.frequency_plot.setAxisScale(axis, fs/2000, fs/2)
         self.frequency_plot.plotData(f, Y)
+
+        self.impulse_plot.replot()
+        self.frequency_plot.replot()
 
 
 #--------------------------------------------------
