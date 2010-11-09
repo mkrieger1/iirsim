@@ -323,7 +323,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         QtGui.QWidget.__init__(self)
 
         # read config, create filter and get names
-        cfgfile = 'directForm2.txt'
+        cfgfile = '../filters/directForm2.txt'
         self.filt = iirsim_cfg.readconfig(cfgfile)
         factor_dict = self.filt.factors()
         factor_bits = self.filt.factor_bits()

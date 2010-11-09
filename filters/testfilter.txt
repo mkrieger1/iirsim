@@ -1,0 +1,14 @@
+bits_global        32
+factor_bits_global  9
+scale_bits_global   7
+
+node Const,    name "const_in",                      input
+node Multiply, name "a",     connect "const_in"
+node Add,      name "add1",  connect "const_in" "a"
+node Add,      name "add2",  connect "a" "add1"
+node Delay,    name "reg1",  connect "b"
+node Delay,    name "reg2",  connect "a"
+node Delay,    name "reg3",  connect "reg1"
+node Add,      name "add3",  connect "reg3" "reg2"
+node Multiply, name "b",     connect "add3",         output
+
