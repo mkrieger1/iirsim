@@ -185,13 +185,14 @@ class intEdit(QtGui.QLineEdit):
         self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
 
 class plotOptions(QtGui.QWidget):
-    def __init__(self):
+    def __init__(self, samples=128, rate=44100, show_time=False):
         QtGui.QWidget.__init__(self)
         self.num_samples_edit = intEdit(8, 8192)
-        self.num_samples_edit.setText('32')
+        self.num_samples_edit.setText(str(samples))
         self.time_checkbox = QtGui.QCheckBox('Show time instead of samples')
+        self.time_checkbox.setChecked(show_time)
         self.sample_rate_edit = floatEdit(1, 1e12)
-        self.sample_rate_edit.setText('50000')
+        self.sample_rate_edit.setText(str(rate))
         grid = QtGui.QGridLayout()
         grid.addWidget(QtGui.QLabel('Samples'),     0, 0)
         grid.addWidget(self.num_samples_edit,       0, 1)
@@ -227,7 +228,7 @@ class plotOptions(QtGui.QWidget):
 
 
 #--------------------------------------------------
-# Plot area
+# Plot Area
 #--------------------------------------------------
 
 class Plot(Qwt5.QwtPlot):
@@ -250,6 +251,65 @@ class Plot(Qwt5.QwtPlot):
 
     def plotData(self, x, y):
         self.curve.setData(x, y)
+
+class FilterResponsePlot(QtGui.QWidget):
+    def __init__(self):
+        QtGui.QWidget.__init__(self)
+        xaxis = Qwt5.QwtPlot.xBottom
+        yaxis = Qwt5.QwtPlot.yLeft
+        self.impulse_plot = Plot('Impulse Response')
+        self.impulse_plot.setAxisScale(yaxis, -1, 1)
+        self.impulse_plot.setAxisTitle(yaxis, 'Amplitude')
+        self.frequency_plot = Plot('Frequency Response')
+        self.frequency_plot.setAxisScale(yaxis, -30, 30)
+        self.frequency_plot.setAxisScaleEngine(xaxis, \
+                                Qwt5.QwtLog10ScaleEngine())
+        self.frequency_plot.setAxisTitle(xaxis, 'Frequency / Hz')
+        self.frequency_plot.setAxisTitle(yaxis, 'Gain / dB')
+
+        vbox = QtGui.QVBoxLayout()
+        vbox.addWidget(self.impulse_plot, 1)
+        vbox.addWidget(self.frequency_plot, 1)
+        self.setLayout(vbox)
+
+    def updatePlot(self, iirfilter, options):
+        length = options['num_samples']
+        fs = options['sample_rate']
+        time = options['time_checked']
+        duration = (length-1)/fs
+        axis = Qwt5.QwtPlot.xBottom
+        if time:
+            prefix = ''
+            if 10*duration < 1:
+                duration = 1000*duration
+                prefix = 'm'
+            if 10*duration < 1:
+                duration = 1000*duration
+                prefix = 'u'
+            if 10*duration < 1:
+                duration = 1000*duration
+                prefix = 'n'
+            self.impulse_plot.setAxisScale(axis, 0, duration)
+            self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
+        else:
+            self.impulse_plot.setAxisScale(axis, 0, length-1)
+            self.impulse_plot.setAxisTitle(axis,'Samples')
+
+        t = numpy.arange(length)
+        if time:
+            t = t*duration/(length-1)
+        y = numpy.array(iirfilter.impulse_response(length, scaled=True))
+        self.impulse_plot.plotData(t, y)
+
+        fftlen = (length+1)/2
+        min_gain = -96 # TODO
+        f = numpy.linspace(0, fs/2, fftlen)
+        Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
+        for i in range(fftlen):
+            if Y[i] == -numpy.Inf:
+                Y[i] = min_gain
+        self.frequency_plot.setAxisScale(axis, fs/2000, fs/2)
+        self.frequency_plot.plotData(f, Y)
 
 
 #--------------------------------------------------
@@ -278,18 +338,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
         plot_options_groupbox = QtGui.QGroupBox('Plot Options')
         plot_options_groupbox.setLayout(self.plot_options.layout())
 
-        # Plot Windows
-        xaxis = Qwt5.QwtPlot.xBottom
-        yaxis = Qwt5.QwtPlot.yLeft
-        self.impulse_plot = Plot('Impulse Response')
-        self.impulse_plot.setAxisScale(yaxis, -1, 1)
-        self.impulse_plot.setAxisTitle(yaxis, 'Amplitude')
-        self.frequency_plot = Plot('Frequency Response')
-        self.frequency_plot.setAxisScale(yaxis, -30, 30)
-        self.frequency_plot.setAxisScaleEngine(xaxis, \
-                                Qwt5.QwtLog10ScaleEngine())
-        self.frequency_plot.setAxisTitle(xaxis, 'Frequency / Hz')
-        self.frequency_plot.setAxisTitle(yaxis, 'Gain / dB')
+        # Plot Area
+        self.plot_area = FilterResponsePlot()
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
@@ -297,67 +347,26 @@ class IIRSimCentralWidget(QtGui.QWidget):
         controlVBox.addWidget(plot_options_groupbox, 0)
         controlVBox.addStretch(1)
 
-        plotVBox = QtGui.QVBoxLayout()
-        plotVBox.addWidget(self.impulse_plot, 1)
-        plotVBox.addWidget(self.frequency_plot, 1)
-
         globalHBox = QtGui.QHBoxLayout()
         globalHBox.addLayout(controlVBox, 1)
         globalHBox.addStretch(0)
-        globalHBox.addLayout(plotVBox, 2)
+        globalHBox.addWidget(self.plot_area, 2)
         self.setLayout(globalHBox)
 
         # signals
         self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
-                     self.updatePlot)
+                     self._updatePlot)
         self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
-                     self.updatePlot)
+                     self._updatePlot)
 
-        self.updatePlot()
+        self._updatePlot()
 
-    def updatePlot(self):
-        options = self.plot_options.get_options()
-        length = options['num_samples']
-        fs = options['sample_rate']
-        time = options['time_checked']
-        duration = (length-1)/fs
-        axis = Qwt5.QwtPlot.xBottom
-        if time:
-            prefix = ''
-            if 10*duration < 1:
-                duration = 1000*duration
-                prefix = 'm'
-            if 10*duration < 1:
-                duration = 1000*duration
-                prefix = 'u'
-            if 10*duration < 1:
-                duration = 1000*duration
-                prefix = 'n'
-            self.impulse_plot.setAxisScale(axis, 0, duration)
-            self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
-        else:
-            self.impulse_plot.setAxisScale(axis, 0, length-1)
-            self.impulse_plot.setAxisTitle(axis,'Samples')
-
+    def _updatePlot(self):
         coefficients = self.slider_grid.getValues()
         for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
-
-        t = numpy.arange(length)
-        if time:
-            t = t*duration/(length-1)
-        y = numpy.array(self.filt.impulse_response(length, scaled=True))
-        self.impulse_plot.plotData(t, y)
-
-        fftlen = (length+1)/2
-        min_gain = -96 # TODO
-        f = numpy.linspace(0, fs/2, fftlen)
-        Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
-        for i in range(fftlen):
-            if Y[i] == -numpy.Inf:
-                Y[i] = min_gain
-        self.frequency_plot.setAxisScale(axis, fs/2000, fs/2)
-        self.frequency_plot.plotData(f, Y)
+        options = self.plot_options.get_options()
+        self.plot_area.updatePlot(self.filt, options)
 
 
 #--------------------------------------------------
