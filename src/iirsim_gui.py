@@ -301,9 +301,11 @@ class FilterResponsePlot(QtGui.QWidget):
         self.impulse_plot.plotData(t, y)
 
         fftlen = (length+1)/2
-        min_gain = -96 # TODO
         f = numpy.linspace(0, fs/2, fftlen)
         Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
+
+        bits = min(iirfilter.bits().values())
+        min_gain = 20*numpy.log10(2**(-bits))
         for i in range(fftlen):
             if Y[i] == -numpy.Inf:
                 Y[i] = min_gain

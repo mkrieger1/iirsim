@@ -363,11 +363,11 @@ class Filter():
         return [self.feed(x, scaled) \
                 for x in _unit_pulse(self._in_node._bits, length, scaled)]
 
-    def factors(self, scaled=False):
-        """Return names of the Multiply nodes with their factors."""
-        return dict(zip(self._mul_node_names, \
-                        [self._nodes[name].factor(scaled) \
-                         for name in self._mul_node_names]))
+    def bits(self):
+        """Return names of all nodes with their number of bits."""
+        return dict(zip(self._nodes.iterkeys(), \
+                        [self._nodes[name]._bits \
+                         for name in self._nodes.iterkeys()]))
 
     def factor_bits(self):
         """Return names of the Multiply nodes with their factor_bits."""
@@ -391,5 +391,11 @@ class Filter():
             raise TypeError('node %s is not an instance of Multiply' % name)
         else:
             mul_node.set_factor(factor, scaled)
+
+    def factors(self, scaled=False):
+        """Return names of the Multiply nodes with their factors."""
+        return dict(zip(self._mul_node_names, \
+                        [self._nodes[name].factor(scaled) \
+                         for name in self._mul_node_names]))
 
 
