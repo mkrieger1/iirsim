@@ -351,6 +351,7 @@ class Filter():
         return output_value
 
     def print_status(self):
+        """Print status message for all nodes."""
         names = self._nodes.keys()
         maxlen = max([len(name) for name in names])
         for name in names:
@@ -397,5 +398,4 @@ class Filter():
         return dict(zip(self._mul_node_names, \
                         [self._nodes[name].factor(scaled) \
                          for name in self._mul_node_names]))
-
 
