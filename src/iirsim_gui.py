@@ -184,13 +184,26 @@ class FactorSliderGrid(QtGui.QWidget):
                      for name in self.factorSliders.iterkeys()])
 
 class FilterSettings(QtGui.QWidget):
-    def __init__(self, factor_dict, bits, factor_bits, scale_bits):
-        QtGui.QWidget.__init__(self, bits)
+    def __init__(self, iirfilter):
+        QtGui.QWidget.__init__(self)
+        factors     = iirfilter.factors()
+        bits        = iirfilter.bits()
+        factor_bits = iirfilter.factor_bits()
+        scale_bits  = iirfilter.scale_bits()
+
         self.bits_edit = intEdit(2, 32)
         self.num_samples_edit.setText(str(bits))
 
-        self.slider_grid = FactorSliderGrid(factor_dict, factor_bits, \
+        self.slider_grid = FactorSliderGrid(factors, factor_bits, \
                                             scale_bits)
+
+        self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
+                     self._signalValueChanged)
+        self.connect(self.bits_edit, QtCore.SIGNAL('editingFinished()'), \
+                     self._signalValueChanged)
+
+    def _signalValueChanged(self):
+        self.emit(QtCore.SIGNAL('valueChanged()'))
 
     def get_settings(self):
         bits = int(self.bits_edit.text())
@@ -270,8 +283,9 @@ class Plot(Qwt5.QwtPlot):
         self.curve.setData(x, y)
 
 class FilterResponsePlot(QtGui.QWidget):
-    def __init__(self):
+    def __init__(self, iirfilter):
         QtGui.QWidget.__init__(self)
+        self.filt = iirfilter
         xaxis = Qwt5.QwtPlot.xBottom
         yaxis = Qwt5.QwtPlot.yLeft
         self.impulse_plot = Plot('Impulse Response')
@@ -289,7 +303,7 @@ class FilterResponsePlot(QtGui.QWidget):
         vbox.addWidget(self.frequency_plot, 1)
         self.setLayout(vbox)
 
-    def updatePlot(self, iirfilter, options):
+    def updatePlot(self, options):
         length = options['num_samples']
         fs = options['sample_rate']
         time = options['time_checked']
@@ -315,14 +329,14 @@ class FilterResponsePlot(QtGui.QWidget):
         t = numpy.arange(length)
         if time:
             t = t*duration/(length-1)
-        y = numpy.array(iirfilter.impulse_response(length, scaled=True))
+        y = numpy.array(self.filt.impulse_response(length, scaled=True))
         self.impulse_plot.plotData(t, y)
 
         fftlen = (length+1)/2
         f = numpy.linspace(0, fs/2, fftlen)
         Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
 
-        bits = min(iirfilter.bits().values())
+        bits = min(self.filt.bits().values())
         min_gain = 20*numpy.log10(2**(-bits))
         for i in range(fftlen):
             if Y[i] == -numpy.Inf:
@@ -361,7 +375,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         plot_options_groupbox.setLayout(self.plot_options.layout())
 
         # Plot Area
-        self.plot_area = FilterResponsePlot()
+        self.plot_area = FilterResponsePlot(self.filt)
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
@@ -388,7 +402,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
         options = self.plot_options.get_options()
-        self.plot_area.updatePlot(self.filt, options)
+        self.plot_area.updatePlot(options)
 
 
 #--------------------------------------------------
