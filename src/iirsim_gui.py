@@ -5,7 +5,55 @@ import iirsim_cfg
 
 
 #--------------------------------------------------
-# Filter coefficient sliders
+# Useful widgets
+#--------------------------------------------------
+
+class floatValidator(QtGui.QDoubleValidator):
+    def __init__(self, float_min, float_max, parent):
+        QtGui.QDoubleValidator.__init__(self, parent)
+        self.setRange(float_min, float_max)
+        self.parent = parent
+
+    def fixup(self, string):
+        d = float(string)
+        if d < self.bottom():
+            d = self.bottom()
+        elif d > self.top():
+            d = self.top()
+        self.parent.setText(str(d))
+        self.parent.emit(QtCore.SIGNAL('editingFinished()'))
+
+class floatEdit(QtGui.QLineEdit):
+    def __init__(self, float_min, float_max):
+        QtGui.QLineEdit.__init__(self)
+        self.validator = floatValidator(float_min, float_max, self)
+        self.setValidator(self.validator)
+        self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+
+class intValidator(QtGui.QIntValidator):
+    def __init__(self, int_min, int_max, parent):
+        QtGui.QIntValidator.__init__(self, parent)
+        self.setRange(int_min, int_max)
+        self.parent = parent
+
+    def fixup(self, string):
+        i = int(string)
+        if i < self.bottom():
+            i = self.bottom()
+        elif i > self.top():
+            i = self.top()
+        self.parent.setText(str(i))
+        self.parent.emit(QtCore.SIGNAL('editingFinished()'))
+
+class intEdit(QtGui.QLineEdit):
+    def __init__(self, int_min, int_max):
+        QtGui.QLineEdit.__init__(self)
+        self.validator = intValidator(int_min, int_max, self)
+        self.setValidator(self.validator)
+        self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+
+#--------------------------------------------------
+# Filter settings
 #--------------------------------------------------
 
 class QSlider_autoticks(QtGui.QSlider):
@@ -107,7 +155,7 @@ class FactorSlider(QtGui.QWidget):
 
 class FactorSliderGrid(QtGui.QWidget):
     """A group of FactorSliders aligned in a grid."""
-    def __init__(self, factor_dict, factor_bits, scale_bits=None):
+    def __init__(self, factor_dict, factor_bits, scale_bits):
         QtGui.QWidget.__init__(self)
 
         self.factorSliders = dict(zip(factor_dict.keys(), \
@@ -135,54 +183,24 @@ class FactorSliderGrid(QtGui.QWidget):
         return dict([self.factorSliders[name].getValue() \
                      for name in self.factorSliders.iterkeys()])
 
+class FilterSettings(QtGui.QWidget):
+    def __init__(self, factor_dict, bits, factor_bits, scale_bits):
+        QtGui.QWidget.__init__(self, bits)
+        self.bits_edit = intEdit(2, 32)
+        self.num_samples_edit.setText(str(bits))
+
+        self.slider_grid = FactorSliderGrid(factor_dict, factor_bits, \
+                                            scale_bits)
+
+    def get_settings(self):
+        bits = int(self.bits_edit.text())
+        factors = self.slider_grid.getValues()
+        return dict([['bits',    bits], \
+                     ['factors', factors]])
 
 #--------------------------------------------------
 # Plot options
 #--------------------------------------------------
-
-class floatValidator(QtGui.QDoubleValidator):
-    def __init__(self, float_min, float_max, parent):
-        QtGui.QDoubleValidator.__init__(self, parent)
-        self.setRange(float_min, float_max)
-        self.parent = parent
-
-    def fixup(self, string):
-        d = float(string)
-        if d < self.bottom():
-            d = self.bottom()
-        elif d > self.top():
-            d = self.top()
-        self.parent.setText(str(d))
-        self.parent.emit(QtCore.SIGNAL('editingFinished()'))
-
-class floatEdit(QtGui.QLineEdit):
-    def __init__(self, float_min, float_max):
-        QtGui.QLineEdit.__init__(self)
-        self.validator = floatValidator(float_min, float_max, self)
-        self.setValidator(self.validator)
-        self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
-
-class intValidator(QtGui.QIntValidator):
-    def __init__(self, int_min, int_max, parent):
-        QtGui.QIntValidator.__init__(self, parent)
-        self.setRange(int_min, int_max)
-        self.parent = parent
-
-    def fixup(self, string):
-        i = int(string)
-        if i < self.bottom():
-            i = self.bottom()
-        elif i > self.top():
-            i = self.top()
-        self.parent.setText(str(i))
-        self.parent.emit(QtCore.SIGNAL('editingFinished()'))
-
-class intEdit(QtGui.QLineEdit):
-    def __init__(self, int_min, int_max):
-        QtGui.QLineEdit.__init__(self)
-        self.validator = intValidator(int_min, int_max, self)
-        self.setValidator(self.validator)
-        self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
 
 class plotOptions(QtGui.QWidget):
     def __init__(self, samples=128, rate=44100, show_time=False):
