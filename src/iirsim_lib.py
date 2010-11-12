@@ -85,14 +85,10 @@ class _FilterComponent():
             raise TypeError("number of inputs must be 'int'")
         elif ninputs < 0:
             raise ValueError("number of inputs must not be negative")
-        elif not _test_int(bits):
-            raise TypeError("number of bits must be 'int'")
-        elif bits < 1:
-            raise ValueError("number of bits must be positive")
         else:
             self._input_nodes = [None for i in range(ninputs)]
             self._ninputs = ninputs
-            self._bits = bits
+        self.set_bits(bits)
 
     def _get_input_values(self):
         if any([node is None for node in self._input_nodes]):
@@ -111,6 +107,8 @@ class _FilterComponent():
             raise ValueError("number of input nodes must be %i" % self._ninputs)
         elif not all([isinstance(x, _FilterComponent) for x in input_nodes]):
             raise TypeError("input nodes must be instance of _FilterComponent")
+        elif not all([node.bits() == self._bits for node in input_nodes]):
+            raise ValueError("number of bits does not match")
         else:
             self._input_nodes = input_nodes
 
@@ -121,6 +119,15 @@ class _FilterComponent():
     def bits(self):
         """Return the number of bits."""
         return self._bits
+
+    def set_bits(self, bits):
+        """Set the number of bits."""
+        if not _test_int(bits):
+            raise TypeError("number of bits must be 'int'")
+        elif bits < 2:
+            raise ValueError("number of bits must be at least 2")
+        else:
+            self._bits = bits
 
 # Const, Add, Multiply, Delay are inherited from the _FilterComponent base class
 #--------------------------------------------------------------------
@@ -366,10 +373,19 @@ class Filter():
                 for x in _unit_pulse(self._in_node._bits, length, scaled)]
 
     def bits(self):
-        """Return names of all nodes with their number of bits."""
-        return dict(zip(self._nodes.iterkeys(), \
-                        [self._nodes[name]._bits \
-                         for name in self._nodes.iterkeys()]))
+        """Return the number of bits for all nodes."""
+        bits_list = [node.bits() for node in self._nodes.itervalues()]
+        if bits_list:
+            test_bits = bits_list[0]
+            if not all([bits == test_bits for bits in bits_list]):
+                raise ValueError( \
+                      'number of bits is not the same for all nodes')
+            return test_bits
+
+    def set_bits(self, bits):
+        """Set the number of bits for all nodes."""
+        for node in self._nodes.itervalues():
+            node.set_bits(bits)
 
     def factor_bits(self):
         """Return names of the Multiply nodes with their factor_bits."""

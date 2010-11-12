@@ -336,8 +336,7 @@ class FilterResponsePlot(QtGui.QWidget):
         f = numpy.linspace(0, fs/2, fftlen)
         Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
 
-        bits = min(self.filt.bits().values())
-        min_gain = 20*numpy.log10(2**(-bits))
+        min_gain = 20*numpy.log10(2**(-self.filt.bits()))
         for i in range(fftlen):
             if Y[i] == -numpy.Inf:
                 Y[i] = min_gain
