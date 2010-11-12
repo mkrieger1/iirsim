@@ -22,6 +22,7 @@ get_output() -- Return the output value by either calling get_output() of the
 # internally used functions
 #--------------------------------------------------------------------
 def _test_int(x):
+    """Combined test for int type and long type."""
     return (isinstance(x, int) or isinstance(x, long))
     
 def _wrap(x, N):
