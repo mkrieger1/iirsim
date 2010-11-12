@@ -192,22 +192,31 @@ class FilterSettings(QtGui.QWidget):
         scale_bits  = iirfilter.scale_bits()
 
         self.bits_edit = intEdit(2, 32)
-        self.num_samples_edit.setText(str(bits))
+        self.bits_edit.setText(str(bits))
 
-        self.slider_grid = FactorSliderGrid(factors, factor_bits, \
-                                            scale_bits)
+        self.sliders = FactorSliderGrid(factors, factor_bits, scale_bits)
 
-        self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
+        self.connect(self.sliders, QtCore.SIGNAL('valueChanged()'), \
                      self._signalValueChanged)
         self.connect(self.bits_edit, QtCore.SIGNAL('editingFinished()'), \
                      self._signalValueChanged)
+
+        settings_grid = QtGui.QGridLayout()
+        settings_grid.addWidget(QtGui.QLabel('Bits'), 0, 0)
+        settings_grid.addWidget(self.bits_edit,       0, 1)
+
+        vbox = QtGui.QVBoxLayout()
+        vbox.addLayout(settings_grid)
+        vbox.addWidget(self.sliders)
+
+        self.setLayout(vbox)
 
     def _signalValueChanged(self):
         self.emit(QtCore.SIGNAL('valueChanged()'))
 
     def get_settings(self):
         bits = int(self.bits_edit.text())
-        factors = self.slider_grid.getValues()
+        factors = self.sliders.getValues()
         return dict([['bits',    bits], \
                      ['factors', factors]])
 
@@ -363,10 +372,9 @@ class IIRSimCentralWidget(QtGui.QWidget):
         scale_bits = self.filt.scale_bits()
 
         # Factor Slider Array
-        self.slider_grid = FactorSliderGrid( \
-            factor_dict, factor_bits, scale_bits)
-        slider_groupbox = QtGui.QGroupBox('Filter coefficients')
-        slider_groupbox.setLayout(self.slider_grid.layout())
+        self.filter_settings = FilterSettings(self.filt)
+        filter_settings_groupbox = QtGui.QGroupBox('Filter Settings')
+        filter_settings_groupbox.setLayout(self.filter_settings.layout())
 
         # Plot Options
         self.plot_options = plotOptions()
@@ -378,7 +386,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
-        controlVBox.addWidget(slider_groupbox, 0)
+        controlVBox.addWidget(filter_settings_groupbox, 0)
         controlVBox.addWidget(plot_options_groupbox, 0)
         controlVBox.addStretch(1)
 
@@ -389,7 +397,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.setLayout(globalHBox)
 
         # signals
-        self.connect(self.slider_grid, QtCore.SIGNAL('valueChanged()'), \
+        self.connect(self.filter_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updatePlot)
         self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
                      self._updatePlot)
@@ -397,9 +405,12 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self._updatePlot()
 
     def _updatePlot(self):
-        coefficients = self.slider_grid.getValues()
+        settings = self.filter_settings.get_settings()
+        coefficients = settings['factors']
+        bits = settings['bits']
         for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
+        self.filt.set_bits(bits)
         options = self.plot_options.get_options()
         self.plot_area.updatePlot(options)
 
