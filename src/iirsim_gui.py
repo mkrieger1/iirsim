@@ -292,10 +292,8 @@ class Plot(Qwt5.QwtPlot):
             curve.detach()
         # shrink or grow list of curves
         if len(data) < len(self.curves):
-            print 'shrink curves from %i to %i' % (len(self.curves), len(data))
             self.curves = self.curves[:len(data)]
         elif len(data) > len(self.curves):
-            print 'grow curves from %i to %i' % (len(self.curves), len(data))
             for i in range(len(data)-len(self.curves)):
                 curve = Qwt5.QwtPlotCurve()
                 curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
