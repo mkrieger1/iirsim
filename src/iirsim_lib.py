@@ -90,12 +90,13 @@ class _FilterComponent():
             self._ninputs = ninputs
         self.set_bits(bits)
 
-    def _get_input_values(self):
+    def _get_input_values(self, ideal=False):
         if any([node is None for node in self._input_nodes]):
             raise RuntimeError("not all inputs are connected")
-        input_values = [node.get_output() for node in self._input_nodes]
-        if any([_test_overflow(value, self._bits) for value in input_values]):
-            raise ValueError("input overflow")
+        input_values = [node.get_output(ideal) for node in self._input_nodes]
+        if not ideal:
+            if any([_test_overflow(value, self._bits) for value in input_values]):
+                raise ValueError("input overflow")
         return input_values
         
     # public methods
@@ -112,7 +113,7 @@ class _FilterComponent():
         else:
             self._input_nodes = input_nodes
 
-    def get_output(self, verbose=False):
+    def get_output(self, ideal=False, verbose=False):
         raise NotImplementedError
         # must be overridden by child class
 
@@ -160,7 +161,7 @@ class Const(_FilterComponent):
         except TypeError:
             raise
     
-    def get_output(self, verbose=False):
+    def get_output(self, ideal=False, verbose=False):
         """Return the stored value."""
         value = self._value
         if verbose:
@@ -179,14 +180,17 @@ class Add(_FilterComponent):
         except (TypeError, ValueError):
             raise
 
-    def get_output(self, verbose=False):
+    def get_output(self, ideal=False, verbose=False):
         """Return the sum of the input values using modular arithmetic."""
         try:
-            input_values = self._get_input_values()
+            input_values = self._get_input_values(ideal)
         except (RuntimeError, ValueError):
             raise
         S = sum(input_values)
-        value = _wrap(S, self._bits)
+        if not ideal:
+            value = _wrap(S, self._bits)
+        else:
+            value = S
         if verbose:
             if S != value:
                 msg = 'OVERFLOW: %i wrapped to %i' % (S, value)
@@ -236,14 +240,17 @@ class Multiply(_FilterComponent):
         else:
             self._factor = factor
 
-    def get_output(self, verbose=False):
+    def get_output(self, ideal=False, verbose=False):
         """Return multiple of the input value using saturation arithmetic."""
         try:
-            [input_value] = self._get_input_values()
+            [input_value] = self._get_input_values(ideal)
         except (RuntimeError, ValueError):
             raise
-        P = (input_value*self._factor) >> self._scale_bits
-        value = _saturate(P, self._bits)
+        if not ideal:
+            P = (input_value*self._factor) >> self._scale_bits
+            value = _saturate(P, self._bits)
+        else:
+            value = float(input_value*self._factor) / 2**self._scale_bits
         if verbose:
             if P != value:
                 msg = 'OVERFLOW: %i saturated to %i' % (P, value)
@@ -279,15 +286,15 @@ class Delay(_FilterComponent):
         """Replace current value with next value."""
         self._value = self._next_value
 
-    def sample(self):
+    def sample(self, ideal=False):
         """Set input value as next value."""
         try:
-            [input_value] = self._get_input_values()
+            [input_value] = self._get_input_values(ideal)
             self._next_value = input_value
         except (RuntimeError, ValueError):
             raise
 
-    def get_output(self, verbose=False):
+    def get_output(self, ideal=False, verbose=False):
         """Return current value."""
         value = self._value
         if verbose:
@@ -335,10 +342,10 @@ class Filter():
             except (TypeError, ValueError):
                 raise
 
-    def _update(self):
+    def _update(self, ideal=False):
         """Update all Delay nodes."""
         for node in self._delay_nodes:
-            node.sample()
+            node.sample(ideal)
         for node in self._delay_nodes:
             node.clk()
 
@@ -347,13 +354,13 @@ class Filter():
         for node in self._delay_nodes:
             node.reset()
 
-    def feed(self, input_value, scaled=False):
+    def feed(self, input_value, scaled=False, ideal=False):
         """Feed new input value into the filter and return output value."""
-        self._update()
+        self._update(ideal)
         if scaled:
             input_value = int(input_value * (1 << self._in_node._bits-1))
         self._in_node.set_value(input_value)
-        output_value = self._out_node.get_output()
+        output_value = self._out_node.get_output(ideal)
         if scaled:
             output_value = float(output_value)/(1<<self._out_node._bits-1)
         return output_value
@@ -366,10 +373,10 @@ class Filter():
             (value, msg) = self._nodes[name].get_output(verbose=True)
             print name.ljust(maxlen), msg
 
-    def impulse_response(self, length, scaled=False):
+    def impulse_response(self, length, scaled=False, ideal=False):
         """Return the impulse response of the filter."""
         self.reset()
-        return [self.feed(x, scaled) \
+        return [self.feed(x, scaled, ideal) \
                 for x in _unit_pulse(self._in_node._bits, length, scaled)]
 
     def bits(self):

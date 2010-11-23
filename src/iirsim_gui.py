@@ -280,16 +280,32 @@ class Plot(Qwt5.QwtPlot):
         self.setCanvasLineWidth(1)
         self.setTitle(title)
 
-        self.curve = Qwt5.QwtPlotCurve()
-        self.curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
-        self.curve.attach(self)
-
         self.grid = Qwt5.QwtPlotGrid()
         self.grid.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0, alpha=32)))
         self.grid.attach(self)
 
-    def plotData(self, x, y):
-        self.curve.setData(x, y)
+        self.curves = []
+
+    def plot(self, data, colors=None):
+        # detach old curves from plot
+        for curve in self.curves:
+            curve.detach()
+        # shrink or grow list of curves
+        if len(data) < len(self.curves):
+            print 'shrink curves from %i to %i' % (len(self.curves), len(data))
+            self.curves = self.curves[:len(data)]
+        elif len(data) > len(self.curves):
+            print 'grow curves from %i to %i' % (len(self.curves), len(data))
+            for i in range(len(data)-len(self.curves)):
+                curve = Qwt5.QwtPlotCurve()
+                curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
+                self.curves.append(curve)
+        # re-attach curves with new data
+        for (i, [x, y]) in enumerate(data):
+            self.curves[i].setData(x, y)
+            if colors is not None:
+                self.curves[i].setPen(QtGui.QPen(colors[i]))
+            self.curves[i].attach(self)
 
 class FilterResponsePlot(QtGui.QWidget):
     def __init__(self, iirfilter):
@@ -335,22 +351,23 @@ class FilterResponsePlot(QtGui.QWidget):
             self.impulse_plot.setAxisScale(axis, 0, length-1)
             self.impulse_plot.setAxisTitle(axis,'Samples')
 
+        colors = [QtCore.Qt.gray, QtCore.Qt.black]
+
         t = numpy.arange(length)
         if time:
             t = t*duration/(length-1)
-        y = numpy.array(self.filt.impulse_response(length, scaled=True))
-        self.impulse_plot.plotData(t, y)
+        [y_id, y] = [numpy.array( \
+                     self.filt.impulse_response(length, True, ideal)) \
+                     for ideal in [True, False]]
+        self.impulse_plot.plot([[t, y_id], [t, y]], colors)
 
         fftlen = (length+1)/2
-        f = numpy.linspace(0, fs/2, fftlen)
-        Y = 20*numpy.log10(numpy.abs(numpy.fft.fft(y)[:fftlen]))
+        f = numpy.linspace(1, fftlen, fftlen)*fs/2/fftlen
+        [Y_id, Y] = [20*numpy.log10(numpy.abs(numpy.fft.fft(data)[1:fftlen])) \
+                    for data in [y_id, y]]
 
-        min_gain = 20*numpy.log10(2**(-self.filt.bits()))
-        for i in range(fftlen):
-            if Y[i] == -numpy.Inf:
-                Y[i] = min_gain
-        self.frequency_plot.setAxisScale(axis, fs/2000, fs/2)
-        self.frequency_plot.plotData(f, Y)
+        self.frequency_plot.setAxisScale(axis, fs/200, fs/2)
+        self.frequency_plot.plot([[f, Y_id], [f, Y]], colors)
 
         self.impulse_plot.replot()
         self.frequency_plot.replot()
