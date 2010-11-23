@@ -73,12 +73,12 @@ class QSlider_autoticks(QtGui.QSlider):
 
 class FactorSlider(QtGui.QWidget):
     """A slider with name and value label and a spin box."""
-    def __init__(self, name, factor_bits, scale_bits=None, factor=None):
+    def __init__(self, name, factor_bits, norm_bits=None, factor=None):
         QtGui.QWidget.__init__(self)
 
-        if scale_bits is None:
-            scale_bits = factor_bits-2
-        self.scale = 2**scale_bits
+        if norm_bits is None:
+            norm_bits = factor_bits-2
+        self.norm = 2**norm_bits
         self.factor_bits = factor_bits
 
         # name label
@@ -96,9 +96,9 @@ class FactorSlider(QtGui.QWidget):
 
         # spinbox
         self.spinBox = QtGui.QDoubleSpinBox()
-        self.spinBox.setMinimum(float(self.slider.minimum())/self.scale)
-        self.spinBox.setMaximum(float(self.slider.maximum())/self.scale)
-        self.spinBox.setSingleStep(1.0/self.scale)
+        self.spinBox.setMinimum(float(self.slider.minimum())/self.norm)
+        self.spinBox.setMaximum(float(self.slider.maximum())/self.norm)
+        self.spinBox.setSingleStep(1.0/self.norm)
         self.spinBox.setDecimals(6)
         self.spinBox.setKeyboardTracking(False)
 
@@ -121,22 +121,22 @@ class FactorSlider(QtGui.QWidget):
             self.slider.setValue(0)
         self._updateLabel()
 
-    def _valueLabelText(self, value=None, scale=None):
+    def _valueLabelText(self, value=None, norm=None):
         if value is None:
             value = self.slider.value()
-        if scale is None:
-            scale = self.scale
-        return '%i/%i =' % (value, scale)
+        if norm is None:
+            norm = self.norm
+        return '%i/%i =' % (value, norm)
 
     def _updateLabel(self):
         text = self._valueLabelText()
         self.valueLabel.setText(text)
 
     def _updateSlider(self):
-        self.slider.setValue(round(self.spinBox.value()*self.scale))
+        self.slider.setValue(round(self.spinBox.value()*self.norm))
 
     def _updateSpinBox(self):
-        self.spinBox.setValue(float(self.slider.value())/self.scale)
+        self.spinBox.setValue(float(self.slider.value())/self.norm)
 
     def _signalValueChanged(self):
         self.emit(QtCore.SIGNAL('valueChanged()'))
@@ -155,11 +155,11 @@ class FactorSlider(QtGui.QWidget):
 
 class FactorSliderGrid(QtGui.QWidget):
     """A group of FactorSliders aligned in a grid."""
-    def __init__(self, factor_dict, factor_bits, scale_bits):
+    def __init__(self, factor_dict, factor_bits, norm_bits):
         QtGui.QWidget.__init__(self)
 
         self.factorSliders = dict(zip(factor_dict.keys(), \
-            [FactorSlider(name, factor_bits[name], scale_bits[name], factor) \
+            [FactorSlider(name, factor_bits[name], norm_bits[name], factor) \
                           for (name, factor) in factor_dict.iteritems()]))
 
         gridLayout = QtGui.QGridLayout()
@@ -189,12 +189,12 @@ class FilterSettings(QtGui.QWidget):
         factors     = iirfilter.factors()
         bits        = iirfilter.bits()
         factor_bits = iirfilter.factor_bits()
-        scale_bits  = iirfilter.scale_bits()
+        norm_bits  = iirfilter.norm_bits()
 
         self.bits_edit = intEdit(2, 32)
         self.bits_edit.setText(str(bits))
 
-        self.sliders = FactorSliderGrid(factors, factor_bits, scale_bits)
+        self.sliders = FactorSliderGrid(factors, factor_bits, norm_bits)
 
         self.connect(self.sliders, QtCore.SIGNAL('valueChanged()'), \
                      self._signalValueChanged)
@@ -355,7 +355,7 @@ class FilterResponsePlot(QtGui.QWidget):
             self.impulse_plot.setAxisScale(axis, 0, length-1)
             self.impulse_plot.setAxisTitle(axis,'Samples')
 
-        x = self.filt.unit_pulse(length, scaled=True)
+        x = self.filt.unit_pulse(length, norm=True)
         [y_id, y] = [numpy.array( \
                      self.filt.response(x, length, True, ideal)) \
                      for ideal in [True, False]]
@@ -386,7 +386,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.filt = iirsim_cfg.readconfig(cfgfile)
         factor_dict = self.filt.factors()
         factor_bits = self.filt.factor_bits()
-        scale_bits = self.filt.scale_bits()
+        norm_bits = self.filt.norm_bits()
 
         # Factor Slider Array
         self.filter_settings = FilterSettings(self.filt)

@@ -61,9 +61,9 @@ def _test_overflow(x, N):
     B = 2**(N-1)
     return (x < -B) or (x > B-1)
 
-def _unit_pulse(bits, length, scaled=False):
+def _unit_pulse(bits, length, norm=False):
     """Return unit pulse as generator object."""
-    if scaled:
+    if norm:
         yield float((1 << bits-1) - 1) / (1 << bits-1)
     else:
         if bits < 2:
@@ -202,8 +202,8 @@ class Add(_FilterComponent):
 
 class Multiply(_FilterComponent):
     """Multiplies the input value by a constant factor."""
-    def __init__(self, bits, factor_bits, scale_bits, factor=0):
-        """Set the number of bits for the input, the factor and the scale."""
+    def __init__(self, bits, factor_bits, norm_bits, factor=0):
+        """Set the number of bits for the input, the factor and the norm."""
         try:
             _FilterComponent.__init__(self, 1, bits)
         except (TypeError, ValueError):
@@ -216,26 +216,26 @@ class Multiply(_FilterComponent):
         else:
             self._factor_bits = factor_bits
 
-        if not _test_int(scale_bits):
-            raise TypeError("scale_bits must be 'int'")
-        elif scale_bits < 0:
-            raise ValueError("scale_bits must not be negative")
+        if not _test_int(norm_bits):
+            raise TypeError("norm_bits must be 'int'")
+        elif norm_bits < 0:
+            raise ValueError("norm_bits must not be negative")
         else:
-            self._scale_bits = scale_bits
+            self._norm_bits = norm_bits
 
         self.set_factor(factor)
 
-    def set_factor(self, factor, scaled=False):
+    def set_factor(self, factor, norm=False):
         """Set the factor."""
-        if scaled:
-            factor = int(round((1 << self._scale_bits)*factor))
+        if norm:
+            factor = int(round((1 << self._norm_bits)*factor))
         if _test_overflow(factor, self._factor_bits):
             min_fact = -1 << self._factor_bits-1
             max_fact = (1 << self._factor_bits-1)-1 
-            min_fact_sc = float(min_fact)/(1 << self._scale_bits)
-            max_fact_sc = float(max_fact)/(1 << self._scale_bits)
+            min_fact_sc = float(min_fact)/(1 << self._norm_bits)
+            max_fact_sc = float(max_fact)/(1 << self._norm_bits)
             raise ValueError( \
-                "factor must be in the range %i to %i (%.6f to %6f scaled)" \
+                "factor must be in the range %i to %i (%.6f to %6f normalized)" \
                              % (min_fact, max_fact, min_fact_sc, max_fact_sc))
         else:
             self._factor = factor
@@ -247,10 +247,10 @@ class Multiply(_FilterComponent):
         except (RuntimeError, ValueError):
             raise
         if not ideal:
-            P = (input_value*self._factor) >> self._scale_bits
+            P = (input_value*self._factor) >> self._norm_bits
             value = _saturate(P, self._bits)
         else:
-            value = float(input_value*self._factor) / 2**self._scale_bits
+            value = float(input_value*self._factor) / 2**self._norm_bits
         if verbose:
             if P != value:
                 msg = 'OVERFLOW: %i saturated to %i' % (P, value)
@@ -260,10 +260,10 @@ class Multiply(_FilterComponent):
         else:
             return value
 
-    def factor(self, scaled=False):
+    def factor(self, norm=False):
         """Return the factor."""
-        if scaled:
-            return float(self._factor)/(1 << self._scale_bits)
+        if norm:
+            return float(self._factor)/(1 << self._norm_bits)
         else:
             return self._factor
 
@@ -354,14 +354,14 @@ class Filter():
         for node in self._delay_nodes:
             node.reset()
 
-    def feed(self, input_value, scaled=False, ideal=False):
+    def feed(self, input_value, norm=False, ideal=False):
         """Feed new input value into the filter and return output value."""
         self._update(ideal)
-        if scaled:
+        if norm:
             input_value = int(input_value * (1 << self._in_node._bits-1))
         self._in_node.set_value(input_value)
         output_value = self._out_node.get_output(ideal)
-        if scaled:
+        if norm:
             output_value = float(output_value)/(1<<self._out_node._bits-1)
         return output_value
 
@@ -373,27 +373,27 @@ class Filter():
             (value, msg) = self._nodes[name].get_output(verbose=True)
             print name.ljust(maxlen), msg
 
-    def unit_pulse(self, length, scaled=False):
+    def unit_pulse(self, length, norm=False):
         """Return the first sample of the unit pulse."""
-        return [x for x in _unit_pulse(self._in_node._bits, length, scaled)]
+        return [x for x in _unit_pulse(self._in_node._bits, length, norm)]
 
-    def response(self, data, length, scaled=False, ideal=False):
+    def response(self, data, length, norm=False, ideal=False):
         """Return the response to the input data."""
         self.reset()
         def gen_response():
             if length > len(data):
                 for x in data:
-                    yield self.feed(x, scaled, ideal)
+                    yield self.feed(x, norm, ideal)
                 for i in range(length-len(data)):
-                    yield self.feed(0, scaled, ideal)
+                    yield self.feed(0, norm, ideal)
             else:
                 for i in range(length):
-                    yield self.feed(data[i], scaled, ideal)
+                    yield self.feed(data[i], norm, ideal)
         return [x for x in gen_response()]
 
-    def impulse_response(self, length, scaled=False, ideal=False):
+    def impulse_response(self, length, norm=False, ideal=False):
         """Return the impulse response of the filter."""
-        return self.response(self.unit_pulse(1, scaled), length, scaled, ideal)
+        return self.response(self.unit_pulse(1, norm), length, norm, ideal)
 
     def bits(self):
         """Return the number of bits for all nodes."""
@@ -416,13 +416,13 @@ class Filter():
                         [self._nodes[name]._factor_bits \
                          for name in self._mul_node_names]))
 
-    def scale_bits(self):
-        """Return names of the Multiply nodes with their scale_bits."""
+    def norm_bits(self):
+        """Return names of the Multiply nodes with their norm_bits."""
         return dict(zip(self._mul_node_names, \
-                        [self._nodes[name]._scale_bits \
+                        [self._nodes[name]._norm_bits \
                          for name in self._mul_node_names]))
 
-    def set_factor(self, name, factor, scaled=False):
+    def set_factor(self, name, factor, norm=False):
         """Set the factor of a Multiply node."""
         try:
             mul_node = self._nodes[name]
@@ -431,11 +431,11 @@ class Filter():
         if not isinstance(mul_node, Multiply):
             raise TypeError('node %s is not an instance of Multiply' % name)
         else:
-            mul_node.set_factor(factor, scaled)
+            mul_node.set_factor(factor, norm)
 
-    def factors(self, scaled=False):
+    def factors(self, norm=False):
         """Return names of the Multiply nodes with their factors."""
         return dict(zip(self._mul_node_names, \
-                        [self._nodes[name].factor(scaled) \
+                        [self._nodes[name].factor(norm) \
                          for name in self._mul_node_names]))
 

@@ -24,7 +24,7 @@ def readconfig(filename):
     # look for global bit settings
     bits_global        = None
     factor_bits_global = None
-    scale_bits_global  = None
+    norm_bits_global  = None
     for cfg_item in cfg_items:
         if 'bits_global' in cfg_item:
             if bits_global is None:
@@ -40,13 +40,13 @@ def readconfig(filename):
             else:
                 raise RuntimeError( \
                     'factor_bits_global must not be specified more than once.')
-        if 'scale_bits_global' in cfg_item:
-            if scale_bits_global is None:
-                [scale_bits_global] = cfg_item.pop('scale_bits_global')
-                scale_bits_global = int(scale_bits_global)
+        if 'norm_bits_global' in cfg_item:
+            if norm_bits_global is None:
+                [norm_bits_global] = cfg_item.pop('norm_bits_global')
+                norm_bits_global = int(norm_bits_global)
             else:
                 raise RuntimeError( \
-                    'scale_bits_global must not be specified more than once.')
+                    'norm_bits_global must not be specified more than once.')
 
     # remove empty items from cfg_items, only node definitions should be left
     cfg_items = filter(None, cfg_items)
@@ -101,18 +101,18 @@ def readconfig(filename):
                         factor_bits = int(factor_bits)
                     else:
                         factor_bits = factor_bits_global
-                    if 'scale_bits' in cfg_item:
-                        [scale_bits] = cfg_item['scale_bits']
-                        scale_bits = int(scale_bits)
+                    if 'norm_bits' in cfg_item:
+                        [norm_bits] = cfg_item['norm_bits']
+                        norm_bits = int(norm_bits)
                     else:
-                        scale_bits = scale_bits_global
-                    if (factor_bits is not None and scale_bits is not None):
+                        norm_bits = norm_bits_global
+                    if (factor_bits is not None and norm_bits is not None):
                         filter_nodes[name] = iirsim_lib.Multiply( \
-                                             bits, factor_bits, scale_bits)
+                                             bits, factor_bits, norm_bits)
                     if 'factor' in cfg_item:
                         [factor] = cfg_item['factor']
                         factor = float(factor)
-                        filter_nodes[name].set_factor(factor, scaled=True)
+                        filter_nodes[name].set_factor(factor, norm=True)
                 else:
                     raise ValueError('Unknown node type: %s' % node)
             else:
