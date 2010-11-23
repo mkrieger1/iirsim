@@ -373,9 +373,9 @@ class Filter():
             (value, msg) = self._nodes[name].get_output(verbose=True)
             print name.ljust(maxlen), msg
 
-    def unit_pulse(self, scaled=False):
+    def unit_pulse(self, length, scaled=False):
         """Return the first sample of the unit pulse."""
-        return [x for x in _unit_pulse(self._in_node._bits, 1, scaled)]
+        return [x for x in _unit_pulse(self._in_node._bits, length, scaled)]
 
     def response(self, data, length, scaled=False, ideal=False):
         """Return the response to the input data."""
@@ -393,7 +393,7 @@ class Filter():
 
     def impulse_response(self, length, scaled=False, ideal=False):
         """Return the impulse response of the filter."""
-        return self.response(self.unit_pulse(scaled), length, scaled, ideal)
+        return self.response(self.unit_pulse(1, scaled), length, scaled, ideal)
 
     def bits(self):
         """Return the number of bits for all nodes."""

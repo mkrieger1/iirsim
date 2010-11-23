@@ -331,7 +331,12 @@ class FilterResponsePlot(QtGui.QWidget):
         fs = options['sample_rate']
         time = options['time_checked']
         duration = (length-1)/fs
+        fftlen = (length+1)/2
+        t = numpy.arange(length)
+        f = numpy.linspace(1, fftlen, fftlen)*fs/2/fftlen
+        colors = [QtCore.Qt.gray, QtCore.Qt.black]
         axis = Qwt5.QwtPlot.xBottom
+
         if time:
             prefix = ''
             if 10*duration < 1:
@@ -345,25 +350,22 @@ class FilterResponsePlot(QtGui.QWidget):
                 prefix = 'n'
             self.impulse_plot.setAxisScale(axis, 0, duration)
             self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
+            t = t*duration/(length-1)
         else:
             self.impulse_plot.setAxisScale(axis, 0, length-1)
             self.impulse_plot.setAxisTitle(axis,'Samples')
 
-        colors = [QtCore.Qt.gray, QtCore.Qt.black]
-
-        t = numpy.arange(length)
-        if time:
-            t = t*duration/(length-1)
+        x = self.filt.unit_pulse(length, scaled=True)
         [y_id, y] = [numpy.array( \
-                     self.filt.impulse_response(length, True, ideal)) \
+                     self.filt.response(x, length, True, ideal)) \
                      for ideal in [True, False]]
+
+        X = 20*numpy.log10(numpy.abs(numpy.fft.fft(x)[1:fftlen]))
+        [Y_id, Y] = \
+            [20*numpy.log10(numpy.abs(numpy.fft.fft(data)[1:fftlen])) - X \
+             for data in [y_id, y]]
+
         self.impulse_plot.plot([[t, y_id], [t, y]], colors)
-
-        fftlen = (length+1)/2
-        f = numpy.linspace(1, fftlen, fftlen)*fs/2/fftlen
-        [Y_id, Y] = [20*numpy.log10(numpy.abs(numpy.fft.fft(data)[1:fftlen])) \
-                    for data in [y_id, y]]
-
         self.frequency_plot.setAxisScale(axis, fs/200, fs/2)
         self.frequency_plot.plot([[f, Y_id], [f, Y]], colors)
 
