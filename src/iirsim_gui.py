@@ -53,6 +53,32 @@ class intEdit(QtGui.QLineEdit):
         self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
 
 #--------------------------------------------------
+# Input data settings
+#--------------------------------------------------
+
+class InputSettings(QtGui.QWidget):
+    def __init__(self):
+        QtGui.QWidget.__init__(self)
+
+        self.dropdown = QtGui.QComboBox()
+        self.dropdown.addItems(['Unit pulse', 'Custom pulse'])
+
+        self.connect(self.dropdown, QtCore.SIGNAL('currentIndexChanged(int)'), \
+                     self._signalChanged)
+
+        vbox = QtGui.QVBoxLayout()
+        vbox.addWidget(self.dropdown)
+        self.setLayout(vbox)
+
+    def get_settings(self):
+        custom_pulse = (self.dropdown.currentIndex() == 1)
+        return dict([ \
+            ['custom_pulse', custom_pulse]])
+
+    def _signalChanged(self):
+        self.emit(QtCore.SIGNAL('valueChanged()'))
+
+#--------------------------------------------------
 # Filter settings
 #--------------------------------------------------
 
@@ -311,10 +337,10 @@ class FilterResponsePlot(QtGui.QWidget):
         self.filt = iirfilter
         xaxis = Qwt5.QwtPlot.xBottom
         yaxis = Qwt5.QwtPlot.yLeft
-        self.impulse_plot = Plot('Impulse Response')
+        self.impulse_plot = Plot('Impulse response')
         self.impulse_plot.setAxisScale(yaxis, -1, 1)
         self.impulse_plot.setAxisTitle(yaxis, 'Amplitude')
-        self.frequency_plot = Plot('Frequency Response')
+        self.frequency_plot = Plot('Frequency response')
         self.frequency_plot.setAxisScale(yaxis, -30, 30)
         self.frequency_plot.setAxisScaleEngine(xaxis, \
                                 Qwt5.QwtLog10ScaleEngine())
@@ -326,10 +352,12 @@ class FilterResponsePlot(QtGui.QWidget):
         vbox.addWidget(self.frequency_plot, 1)
         self.setLayout(vbox)
 
-    def updatePlot(self, options):
+    def updatePlot(self, options, input_settings):
         length = options['num_samples']
         fs = options['sample_rate']
         time = options['time_checked']
+        custom = input_settings['custom_pulse']
+
         duration = (length-1)/fs
         fftlen = (length+1)/2
         t = numpy.arange(length)
@@ -349,13 +377,17 @@ class FilterResponsePlot(QtGui.QWidget):
                 duration = 1000*duration
                 prefix = 'n'
             self.impulse_plot.setAxisScale(axis, 0, duration)
-            self.impulse_plot.setAxisTitle(axis,'Time / %ss' % prefix)
+            self.impulse_plot.setAxisTitle(axis, 'Time / %ss' % prefix)
             t = t*duration/(length-1)
         else:
             self.impulse_plot.setAxisScale(axis, 0, length-1)
-            self.impulse_plot.setAxisTitle(axis,'Samples')
+            self.impulse_plot.setAxisTitle(axis, 'Samples')
 
-        x = self.filt.unit_pulse(length, norm=True)
+        if custom:
+            x = self.filt.unit_pulse(length, norm=True) # TODO
+        else:
+            x = self.filt.unit_pulse(length, norm=True)
+
         [y_id, y] = [numpy.array( \
                      self.filt.response(x, length, True, ideal)) \
                      for ideal in [True, False]]
@@ -388,14 +420,19 @@ class IIRSimCentralWidget(QtGui.QWidget):
         factor_bits = self.filt.factor_bits()
         norm_bits = self.filt.norm_bits()
 
+        # Input Data Settings
+        self.input_settings = InputSettings()
+        input_settings_groupbox = QtGui.QGroupBox('Input data')
+        input_settings_groupbox.setLayout(self.input_settings.layout())
+
         # Factor Slider Array
         self.filter_settings = FilterSettings(self.filt)
-        filter_settings_groupbox = QtGui.QGroupBox('Filter Settings')
+        filter_settings_groupbox = QtGui.QGroupBox('Filter settings')
         filter_settings_groupbox.setLayout(self.filter_settings.layout())
 
         # Plot Options
         self.plot_options = plotOptions()
-        plot_options_groupbox = QtGui.QGroupBox('Plot Options')
+        plot_options_groupbox = QtGui.QGroupBox('Plot options')
         plot_options_groupbox.setLayout(self.plot_options.layout())
 
         # Plot Area
@@ -403,6 +440,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
+        controlVBox.addWidget(input_settings_groupbox, 0)
         controlVBox.addWidget(filter_settings_groupbox, 0)
         controlVBox.addWidget(plot_options_groupbox, 0)
         controlVBox.addStretch(1)
@@ -414,6 +452,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.setLayout(globalHBox)
 
         # signals
+        self.connect(self.input_settings, QtCore.SIGNAL('valueChanged()'), \
+                     self._updatePlot)
         self.connect(self.filter_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updatePlot)
         self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
@@ -422,14 +462,16 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self._updatePlot()
 
     def _updatePlot(self):
-        settings = self.filter_settings.get_settings()
-        coefficients = settings['factors']
-        bits = settings['bits']
+        filter_settings = self.filter_settings.get_settings()
+        coefficients = filter_settings['factors']
+        bits = filter_settings['bits']
         for (name, value) in coefficients.iteritems():
             self.filt.set_factor(name, value)
         self.filt.set_bits(bits)
+
+        input_settings = self.input_settings.get_settings()
         options = self.plot_options.get_options()
-        self.plot_area.updatePlot(options)
+        self.plot_area.updatePlot(options, input_settings)
 
 
 #--------------------------------------------------
@@ -441,6 +483,7 @@ class IIRSimMainWindow(QtGui.QMainWindow):
         QtGui.QMainWindow.__init__(self)
         mainTitle = 'IIRSim'
         self.setWindowTitle(mainTitle)
+        self.resize(960, 540)
 
         self.setCentralWidget(IIRSimCentralWidget())
 

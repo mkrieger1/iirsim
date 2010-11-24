@@ -146,20 +146,20 @@ class Const(_FilterComponent):
         except (TypeError, ValueError):
             raise
 
-    def set_value(self, value):
+    def set_value(self, value, ideal=False):
         """Set the stored value.
 
         For N the number of bits, valid inputs are integer numbers x where
         -B <= x < B, with B = 2^(N-1) the largest absolute value.
         """
-        try:
-            input_overflow = _test_overflow(value, self._bits)
+        if not ideal:
+            try:
+                input_overflow = _test_overflow(value, self._bits)
+            except TypeError:
+                raise
             if input_overflow:
                 raise ValueError("input overflow")
-            else:
-                self._value = value
-        except TypeError:
-            raise
+        self._value = value
     
     def get_output(self, ideal=False, verbose=False):
         """Return the stored value."""
@@ -358,8 +358,10 @@ class Filter():
         """Feed new input value into the filter and return output value."""
         self._update(ideal)
         if norm:
-            input_value = int(input_value * (1 << self._in_node._bits-1))
-        self._in_node.set_value(input_value)
+            input_value = input_value * (1 << self._in_node._bits-1)
+        if not ideal:
+            input_value = int(input_value)
+        self._in_node.set_value(input_value, ideal)
         output_value = self._out_node.get_output(ideal)
         if norm:
             output_value = float(output_value)/(1<<self._out_node._bits-1)
