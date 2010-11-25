@@ -164,6 +164,8 @@ class Const(_FilterComponent):
     def get_output(self, ideal=False, verbose=False):
         """Return the stored value."""
         value = self._value
+        if not ideal:
+            value = int(value)
         if verbose:
             msg = 'returning %i' % value
             return (value, msg)
@@ -297,6 +299,8 @@ class Delay(_FilterComponent):
     def get_output(self, ideal=False, verbose=False):
         """Return current value."""
         value = self._value
+        if not ideal:
+            value = int(value)
         if verbose:
             msg = 'returning %i' % value
             return (value, msg)

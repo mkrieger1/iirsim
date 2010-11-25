@@ -8,6 +8,7 @@ import iirsim_cfg
 # Useful widgets
 #--------------------------------------------------
 
+# float line edit
 class floatValidator(QtGui.QDoubleValidator):
     def __init__(self, float_min, float_max, parent):
         QtGui.QDoubleValidator.__init__(self, parent)
@@ -30,6 +31,7 @@ class floatEdit(QtGui.QLineEdit):
         self.setValidator(self.validator)
         self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
 
+# int  line edit
 class intValidator(QtGui.QIntValidator):
     def __init__(self, int_min, int_max, parent):
         QtGui.QIntValidator.__init__(self, parent)
@@ -52,6 +54,73 @@ class intEdit(QtGui.QLineEdit):
         self.setValidator(self.validator)
         self.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
 
+# file selection/load/save
+class LineEditDnD(QtGui.QLineEdit):
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            url = event.mimeData().urls()[0]
+            if url.scheme() == 'file':
+                event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        filename = str(event.mimeData().urls()[0].toLocalFile())
+        self.setText(os.path.realpath(filename))
+
+class FileSelect(QtGui.QWidget):
+    def __init__(self, what):
+        QtGui.QWidget.__init__(self)
+        self.filename_edit = LineEditDnD()
+        self.filename_edit.setToolTip('Enter path to %s' % what)
+
+        self.loadbutton = QtGui.QPushButton('Load...')
+        self.savebutton = QtGui.QPushButton('Save...')
+        self.loadbutton.setToolTip('Load custom pulse from file')
+        self.savebutton.setToolTip('Save filtered pulse to file')
+        self.last_path = os.path.expanduser('~')
+
+        self.connect(self.loadbutton, QtCore.SIGNAL('clicked()'), \
+            self._select_load_file)
+        self.connect(self.savebutton, QtCore.SIGNAL('clicked()'), \
+            self._select_save_file)
+        self.connect(self.filename_edit, \
+            QtCore.SIGNAL('textChanged(QString)'), self._signalTextChanged)
+
+        hbox = QtGui.QHBoxLayout()
+        hbox.addStretch()
+        hbox.addWidget(self.loadbutton)
+        hbox.addWidget(self.savebutton)
+        vbox = QtGui.QVBoxLayout()
+        vbox.addWidget(self.filename_edit)
+        vbox.addLayout(hbox)
+        vbox.setMargin(0)
+        self.setLayout(vbox)
+
+    def get_load_filename(self):
+        return self.filename_edit.text()
+ 
+    def _select_load_file(self):
+        filename = QtGui.QFileDialog.getOpenFileName(self, \
+            caption = 'Load custom pulse from file', \
+            #filter = 'Text files (*.txt);;All Files (*.*)', \
+            directory = self.last_path)
+        if filename: # False if dialog is cancelled
+            self.last_path = os.path.dirname(str(filename))
+            self.filename_edit.setText(filename)
+ 
+    def _select_save_file(self):
+        filename = QtGui.QFileDialog.getSaveFileName(self, \
+            caption = 'Save filtered pulse to file', \
+            #filter = 'Text files (*.txt);;All Files (*.*)', \
+            directory = self.last_path)
+        if filename: # False if dialog is cancelled
+            self.last_path = os.path.dirname(str(filename))
+            print 'saving to %s' % filename #TODO
+
+    def _signalTextChanged(self):
+        self.emit(QtCore.SIGNAL('textChanged()'))
+
 #--------------------------------------------------
 # Input data settings
 #--------------------------------------------------
@@ -63,19 +132,29 @@ class InputSettings(QtGui.QWidget):
         self.dropdown = QtGui.QComboBox()
         self.dropdown.addItems(['Unit pulse', 'Custom pulse'])
 
+        self.file_select = FileSelect('pulse file')
+
         self.connect(self.dropdown, QtCore.SIGNAL('currentIndexChanged(int)'), \
+                     self._signalChanged)
+        self.connect(self.file_select, QtCore.SIGNAL('textChanged()'), \
                      self._signalChanged)
 
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.dropdown)
+        vbox.addWidget(self.file_select)
         self.setLayout(vbox)
+
+        self._signalChanged()
 
     def get_settings(self):
         custom_pulse = (self.dropdown.currentIndex() == 1)
+        pulse_file = self.file_select.get_load_filename()
         return dict([ \
-            ['custom_pulse', custom_pulse]])
+            ['custom_pulse', custom_pulse], \
+            ['pulse_file', pulse_file]])
 
     def _signalChanged(self):
+        self.file_select.setEnabled(self.dropdown.currentIndex()==1)
         self.emit(QtCore.SIGNAL('valueChanged()'))
 
 #--------------------------------------------------
@@ -200,6 +279,7 @@ class FactorSliderGrid(QtGui.QWidget):
                              for slider in self.factorSliders.itervalues()])
         gridLayout.setColumnMinimumWidth(1, 50)
         gridLayout.setColumnMinimumWidth(2, minLabelWidth)
+        gridLayout.setMargin(0)
         self.setLayout(gridLayout)
 
     def _signalValueChanged(self):
@@ -357,12 +437,13 @@ class FilterResponsePlot(QtGui.QWidget):
         fs = options['sample_rate']
         time = options['time_checked']
         custom = input_settings['custom_pulse']
+        pulse_file = input_settings['pulse_file']
 
         duration = (length-1)/fs
         fftlen = (length+1)/2
         t = numpy.arange(length)
         f = numpy.linspace(1, fftlen, fftlen)*fs/2/fftlen
-        colors = [QtCore.Qt.gray, QtCore.Qt.black]
+        colors = [QtCore.Qt.gray, QtCore.Qt.black, QtCore.Qt.blue]
         axis = Qwt5.QwtPlot.xBottom
 
         if time:
@@ -383,10 +464,14 @@ class FilterResponsePlot(QtGui.QWidget):
             self.impulse_plot.setAxisScale(axis, 0, length-1)
             self.impulse_plot.setAxisTitle(axis, 'Samples')
 
+        x = self.filt.unit_pulse(length, norm=True)
         if custom:
-            x = self.filt.unit_pulse(length, norm=True) # TODO
-        else:
-            x = self.filt.unit_pulse(length, norm=True)
+            if pulse_file:
+                pf = open(pulse_file)
+                x = map(float, pf.read().splitlines())
+                pf.close()
+                while len(x) < length:
+                    x.append(0.0)
 
         [y_id, y] = [numpy.array( \
                      self.filt.response(x, length, True, ideal)) \
@@ -397,9 +482,13 @@ class FilterResponsePlot(QtGui.QWidget):
             [20*numpy.log10(numpy.abs(numpy.fft.fft(data)[1:fftlen])) - X \
              for data in [y_id, y]]
 
-        self.impulse_plot.plot([[t, y_id], [t, y]], colors)
+        impulse_plot_data = [[t, y_id], [t, y]]
+        frequency_plot_data = [[f, Y_id], [f, Y]]
+        if custom:
+            impulse_plot_data.append([t, x])
+        self.impulse_plot.plot(impulse_plot_data, colors)
         self.frequency_plot.setAxisScale(axis, fs/200, fs/2)
-        self.frequency_plot.plot([[f, Y_id], [f, Y]], colors)
+        self.frequency_plot.plot(frequency_plot_data, colors)
 
         self.impulse_plot.replot()
         self.frequency_plot.replot()
