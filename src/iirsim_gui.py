@@ -148,16 +148,25 @@ class InputSettings(QtGui.QWidget):
         self._signalChanged()
 
     def get_settings(self):
-        custom_pulse = (self.dropdown.currentIndex() == 1)
+        if self.dropdown.currentIndex() == 1:
+            pulse_type = 'custom'
+        else:
+            pulse_type = 'unit'
         pulse_file = self.file_select.text()
         return dict([ \
-            ['custom_pulse', custom_pulse], \
+            ['pulse_type', pulse_type], \
             ['pulse_file', pulse_file]])
 
     def _signalChanged(self):
-        self.file_select.setEnabled(self.dropdown.currentIndex()==1)
-        if self.file_select.text():
+        pulse_type = self.get_settings()['pulse_type']
+        if pulse_type == 'unit':
+            self.file_select.setEnabled(False)
             self.emit(QtCore.SIGNAL('valueChanged()'))
+        else:
+            self.file_select.setEnabled(True)
+            if self.file_select.text():
+                self.emit(QtCore.SIGNAL('valueChanged()'))
+            
 
 #--------------------------------------------------
 # Filter settings
@@ -406,12 +415,14 @@ class Plot(Qwt5.QwtPlot):
                 curve = Qwt5.QwtPlotCurve()
                 curve.setRenderHint(Qwt5.QwtPlotItem.RenderAntialiased)
                 self.curves.append(curve)
-        # re-attach curves with new data
+        # re-attach curves with new data in reversed order so that the first
+        # item in the data list is on top
         for (i, [x, y]) in enumerate(data):
             self.curves[i].setData(x, y)
             if colors is not None:
                 self.curves[i].setPen(QtGui.QPen(colors[i]))
-            self.curves[i].attach(self)
+        for curve in reversed(self.curves):
+            curve.attach(self)
 
 class FilterResponsePlot(QtGui.QWidget):
     def __init__(self, iirfilter):
@@ -434,13 +445,11 @@ class FilterResponsePlot(QtGui.QWidget):
         vbox.addWidget(self.frequency_plot, 1)
         self.setLayout(vbox)
 
-    def updatePlot(self, options, input_settings):
+    def updatePlot(self, data, options):
+        use_unit_pulse = (data is None)
         length = options['num_samples']
         fs = options['sample_rate']
         time = options['time_checked']
-        custom = input_settings['custom_pulse']
-        pulse_file = input_settings['pulse_file']
-
         duration = (length-1)/fs
         fftlen = (length+1)/2
         t = numpy.arange(length)
@@ -465,23 +474,12 @@ class FilterResponsePlot(QtGui.QWidget):
             self.impulse_plot.setAxisScale(axis, 0, length-1)
             self.impulse_plot.setAxisTitle(axis, 'Samples')
 
-        x = self.filt.unit_pulse(length, norm=True)
-        if custom:
-            if not os.path.isfile(pulse_file):
-                raise IOError('File "%s" does not exist' % pulse_file)
-            try:
-                pf = open(pulse_file)
-            except IOError as (msg, ):
-                raise
-            try:
-                x = map(float, pf.read().splitlines())
-            except ValueError:
-                raise IOError('Could not read data from file "%s"' % pulse_file)
-            pf.close()
-            if not x:
-                raise IOError('File "%s" contains no data' % pulse_file)
-            while len(x) < length:
-                x.append(0.0)
+        if use_unit_pulse:
+            x = self.filt.unit_pulse(length, norm=True)
+        else:
+            x = data
+        while len(x) < length:
+            x.append(0.0)
 
         [y_id, y] = [numpy.array( \
                      self.filt.response(x, length, True, ideal)) \
@@ -492,12 +490,11 @@ class FilterResponsePlot(QtGui.QWidget):
             [20*numpy.log10(numpy.abs(numpy.fft.fft(data)[1:fftlen])) - X \
              for data in [y_id, y]]
 
-        impulse_plot_data = [[t, y_id], [t, y]]
-        frequency_plot_data = [[f, Y_id], [f, Y]]
-        colors = [QtCore.Qt.gray, QtCore.Qt.black]
-        if custom:
-            impulse_plot_data.insert(0, [t, x])
-            colors.insert(0, QtCore.Qt.blue)
+        colors = [QtCore.Qt.black, QtCore.Qt.gray, QtCore.Qt.blue]
+        impulse_plot_data = [[t, y], [t, y_id]]
+        frequency_plot_data = [[f, Y], [f, Y_id]]
+        if not use_unit_pulse:
+            impulse_plot_data.append([t, x])
 
         self.impulse_plot.plot(impulse_plot_data, colors)
         self.frequency_plot.setAxisScale(axis, fs/200, fs/2)
@@ -521,34 +518,35 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # read config, create filter and get names
         cfgfile = '../filters/directForm2.txt'
-        self.filt = iirsim_cfg.readconfig(cfgfile)
+        self.filt = iirsim_cfg.read_config(cfgfile)
         factor_dict = self.filt.factors()
         factor_bits = self.filt.factor_bits()
         norm_bits = self.filt.norm_bits()
 
         # Input Data Settings
         self.input_settings = InputSettings()
-        input_settings_groupbox = QtGui.QGroupBox('Input data')
-        input_settings_groupbox.setLayout(self.input_settings.layout())
+        self.input_settings_groupbox = QtGui.QGroupBox('Input data')
+        self.input_settings_groupbox.setLayout(self.input_settings.layout())
+        self.input_data = None
 
         # Factor Slider Array
         self.filter_settings = FilterSettings(self.filt)
-        filter_settings_groupbox = QtGui.QGroupBox('Filter settings')
-        filter_settings_groupbox.setLayout(self.filter_settings.layout())
+        self.filter_settings_groupbox = QtGui.QGroupBox('Filter settings')
+        self.filter_settings_groupbox.setLayout(self.filter_settings.layout())
 
         # Plot Options
         self.plot_options = plotOptions()
-        plot_options_groupbox = QtGui.QGroupBox('Plot options')
-        plot_options_groupbox.setLayout(self.plot_options.layout())
+        self.plot_options_groupbox = QtGui.QGroupBox('Plot options')
+        self.plot_options_groupbox.setLayout(self.plot_options.layout())
 
         # Plot Area
         self.plot_area = FilterResponsePlot(self.filt)
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
-        controlVBox.addWidget(input_settings_groupbox, 0)
-        controlVBox.addWidget(filter_settings_groupbox, 0)
-        controlVBox.addWidget(plot_options_groupbox, 0)
+        controlVBox.addWidget(self.input_settings_groupbox, 0)
+        controlVBox.addWidget(self.filter_settings_groupbox, 0)
+        controlVBox.addWidget(self.plot_options_groupbox, 0)
         controlVBox.addStretch(1)
 
         globalHBox = QtGui.QHBoxLayout()
@@ -559,13 +557,37 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # signals
         self.connect(self.input_settings, QtCore.SIGNAL('valueChanged()'), \
-                     self._updatePlot)
+                     self._updateInput)
         self.connect(self.filter_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updatePlot)
         self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
                      self._updatePlot)
 
-        self._updatePlot()
+        self._updateInput()
+
+    def _updateInput(self):
+        input_settings = self.input_settings.get_settings()
+        pulse_type = input_settings['pulse_type']
+        pulse_file = input_settings['pulse_file']
+
+        data = None
+        input_valid = True
+
+        if pulse_type == 'custom':
+            try:
+                data = iirsim_cfg.read_data(pulse_file)
+            except IOError as (msg, ):
+                input_valid = False
+                self.filter_settings_groupbox.setEnabled(False)
+                self.plot_options_groupbox.setEnabled(False)
+                self.status_bar.showMessage('Error: %s' % msg)
+
+        if input_valid:
+            self.input_data = data
+            self.filter_settings_groupbox.setEnabled(True)
+            self.plot_options_groupbox.setEnabled(True)
+            self.status_bar.clearMessage()
+            self._updatePlot()
 
     def _updatePlot(self):
         filter_settings = self.filter_settings.get_settings()
@@ -575,13 +597,9 @@ class IIRSimCentralWidget(QtGui.QWidget):
             self.filt.set_factor(name, value)
         self.filt.set_bits(bits)
 
-        input_settings = self.input_settings.get_settings()
+        data = self.input_data
         options = self.plot_options.get_options()
-        try:
-            self.plot_area.updatePlot(options, input_settings)
-            self.status_bar.clearMessage()
-        except IOError as (msg, ):
-            self.status_bar.showMessage('Error: %s' % msg)
+        self.plot_area.updatePlot(data, options)
 
 
 #--------------------------------------------------

@@ -1,7 +1,7 @@
-import shlex
+import shlex, os
 import iirsim_lib
 
-def readconfig(filename):
+def read_config(filename):
     """Read configuration file and return a filter."""
     # parse config file
     cfg_items = []
@@ -131,6 +131,23 @@ def readconfig(filename):
         return iirsim_lib.Filter(filter_nodes, adjacency, \
                                  input_node, output_node)
 
+def read_data(filename):
+    if not os.path.isfile(filename):
+        raise IOError('File "%s" does not exist' % filename)
+    try:
+        f = open(filename)
+    except IOError:
+        raise IOError('Could not open file "%s"' % filename)
+    try:
+        x = map(float, f.read().splitlines())
+    except ValueError:
+        raise IOError('Could not read data from file "%s"' % filename)
+    f.close()
+    if not x:
+        raise IOError('File "%s" contains no data' % filename)
+    return x
+    
+
 if __name__=='__main__':
-    readconfig('directForm2.txt')
+    read_config('directForm2.txt')
 
