@@ -85,7 +85,7 @@ class FileSelect(QtGui.QWidget):
         self.connect(self.savebutton, QtCore.SIGNAL('clicked()'), \
             self._select_save_file)
         self.connect(self.filename_edit, \
-            QtCore.SIGNAL('textChanged(QString)'), self._signalTextChanged)
+            QtCore.SIGNAL('editingFinished()'), self._signalEditingFinished)
 
         hbox = QtGui.QHBoxLayout()
         hbox.addStretch()
@@ -97,7 +97,7 @@ class FileSelect(QtGui.QWidget):
         vbox.setMargin(0)
         self.setLayout(vbox)
 
-    def get_load_filename(self):
+    def text(self):
         return self.filename_edit.text()
  
     def _select_load_file(self):
@@ -108,6 +108,7 @@ class FileSelect(QtGui.QWidget):
         if filename: # False if dialog is cancelled
             self.last_path = os.path.dirname(str(filename))
             self.filename_edit.setText(filename)
+            self._signalEditingFinished()
  
     def _select_save_file(self):
         filename = QtGui.QFileDialog.getSaveFileName(self, \
@@ -118,8 +119,8 @@ class FileSelect(QtGui.QWidget):
             self.last_path = os.path.dirname(str(filename))
             print 'saving to %s' % filename #TODO
 
-    def _signalTextChanged(self):
-        self.emit(QtCore.SIGNAL('textChanged()'))
+    def _signalEditingFinished(self):
+        self.emit(QtCore.SIGNAL('editingFinished()'))
 
 #--------------------------------------------------
 # Input data settings
@@ -136,7 +137,7 @@ class InputSettings(QtGui.QWidget):
 
         self.connect(self.dropdown, QtCore.SIGNAL('currentIndexChanged(int)'), \
                      self._signalChanged)
-        self.connect(self.file_select, QtCore.SIGNAL('textChanged()'), \
+        self.connect(self.file_select, QtCore.SIGNAL('editingFinished()'), \
                      self._signalChanged)
 
         vbox = QtGui.QVBoxLayout()
@@ -148,14 +149,15 @@ class InputSettings(QtGui.QWidget):
 
     def get_settings(self):
         custom_pulse = (self.dropdown.currentIndex() == 1)
-        pulse_file = self.file_select.get_load_filename()
+        pulse_file = self.file_select.text()
         return dict([ \
             ['custom_pulse', custom_pulse], \
             ['pulse_file', pulse_file]])
 
     def _signalChanged(self):
         self.file_select.setEnabled(self.dropdown.currentIndex()==1)
-        self.emit(QtCore.SIGNAL('valueChanged()'))
+        if self.file_select.text():
+            self.emit(QtCore.SIGNAL('valueChanged()'))
 
 #--------------------------------------------------
 # Filter settings
@@ -443,7 +445,6 @@ class FilterResponsePlot(QtGui.QWidget):
         fftlen = (length+1)/2
         t = numpy.arange(length)
         f = numpy.linspace(1, fftlen, fftlen)*fs/2/fftlen
-        colors = [QtCore.Qt.gray, QtCore.Qt.black, QtCore.Qt.blue]
         axis = Qwt5.QwtPlot.xBottom
 
         if time:
@@ -466,12 +467,21 @@ class FilterResponsePlot(QtGui.QWidget):
 
         x = self.filt.unit_pulse(length, norm=True)
         if custom:
-            if pulse_file:
+            if not os.path.isfile(pulse_file):
+                raise IOError('File "%s" does not exist' % pulse_file)
+            try:
                 pf = open(pulse_file)
+            except IOError as (msg, ):
+                raise
+            try:
                 x = map(float, pf.read().splitlines())
-                pf.close()
-                while len(x) < length:
-                    x.append(0.0)
+            except ValueError:
+                raise IOError('Could not read data from file "%s"' % pulse_file)
+            pf.close()
+            if not x:
+                raise IOError('File "%s" contains no data' % pulse_file)
+            while len(x) < length:
+                x.append(0.0)
 
         [y_id, y] = [numpy.array( \
                      self.filt.response(x, length, True, ideal)) \
@@ -484,8 +494,11 @@ class FilterResponsePlot(QtGui.QWidget):
 
         impulse_plot_data = [[t, y_id], [t, y]]
         frequency_plot_data = [[f, Y_id], [f, Y]]
+        colors = [QtCore.Qt.gray, QtCore.Qt.black]
         if custom:
-            impulse_plot_data.append([t, x])
+            impulse_plot_data.insert(0, [t, x])
+            colors.insert(0, QtCore.Qt.blue)
+
         self.impulse_plot.plot(impulse_plot_data, colors)
         self.frequency_plot.setAxisScale(axis, fs/200, fs/2)
         self.frequency_plot.plot(frequency_plot_data, colors)
@@ -499,8 +512,12 @@ class FilterResponsePlot(QtGui.QWidget):
 #--------------------------------------------------
 
 class IIRSimCentralWidget(QtGui.QWidget):
-    def __init__(self):
+    def __init__(self, status_bar=None):
         QtGui.QWidget.__init__(self)
+
+        # status bar, if provided
+        if status_bar is not None:
+            self.status_bar = status_bar
 
         # read config, create filter and get names
         cfgfile = '../filters/directForm2.txt'
@@ -560,7 +577,11 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         input_settings = self.input_settings.get_settings()
         options = self.plot_options.get_options()
-        self.plot_area.updatePlot(options, input_settings)
+        try:
+            self.plot_area.updatePlot(options, input_settings)
+            self.status_bar.clearMessage()
+        except IOError as (msg, ):
+            self.status_bar.showMessage('Error: %s' % msg)
 
 
 #--------------------------------------------------
@@ -574,9 +595,9 @@ class IIRSimMainWindow(QtGui.QMainWindow):
         self.setWindowTitle(mainTitle)
         self.resize(960, 540)
 
-        self.setCentralWidget(IIRSimCentralWidget())
-
         statusBar = QtGui.QStatusBar()
         statusBar.addWidget(QtGui.QLabel('Ready'))
         self.setStatusBar(statusBar)
+
+        self.setCentralWidget(IIRSimCentralWidget(statusBar))
 
