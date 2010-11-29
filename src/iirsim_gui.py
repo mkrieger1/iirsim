@@ -445,7 +445,7 @@ class FilterResponsePlot(QtGui.QWidget):
         vbox.addWidget(self.frequency_plot, 1)
         self.setLayout(vbox)
 
-    def updatePlot(self, data, options):
+    def replot(self, data, options):
         use_unit_pulse = (data is None)
         length = options['num_samples']
         fs = options['sample_rate']
@@ -555,7 +555,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         globalHBox.addWidget(self.plot_area, 2)
         self.setLayout(globalHBox)
 
-        # signals
+        # connect signals
         self.connect(self.input_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updateInput)
         self.connect(self.filter_settings, QtCore.SIGNAL('valueChanged()'), \
@@ -563,8 +563,14 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
                      self._updatePlot)
 
+        # read input data and plot once
         self._updateInput()
 
+    def _setControlsEnabled(self, enabled):
+        self.filter_settings_groupbox.setEnabled(enabled)
+        self.plot_options_groupbox.setEnabled(enabled)
+
+    # slots
     def _updateInput(self):
         input_settings = self.input_settings.get_settings()
         pulse_type = input_settings['pulse_type']
@@ -578,14 +584,12 @@ class IIRSimCentralWidget(QtGui.QWidget):
                 data = iirsim_cfg.read_data(pulse_file)
             except IOError as (msg, ):
                 input_valid = False
-                self.filter_settings_groupbox.setEnabled(False)
-                self.plot_options_groupbox.setEnabled(False)
+                self._setControlsEnabled(False)
                 self.status_bar.showMessage('Error: %s' % msg)
 
         if input_valid:
             self.input_data = data
-            self.filter_settings_groupbox.setEnabled(True)
-            self.plot_options_groupbox.setEnabled(True)
+            self._setControlsEnabled(True)
             self.status_bar.clearMessage()
             self._updatePlot()
 
@@ -599,7 +603,13 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         data = self.input_data
         options = self.plot_options.get_options()
-        self.plot_area.updatePlot(data, options)
+        try:
+            self._setControlsEnabled(True)
+            self.plot_area.replot(data, options)
+        except ValueError as (msg, ):
+            self._setControlsEnabled(False)
+            self.status_bar.showMessage('Error: %s' % msg)
+        
 
 
 #--------------------------------------------------

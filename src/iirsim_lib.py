@@ -147,27 +147,21 @@ class Const(_FilterComponent):
             raise
 
     def set_value(self, value, ideal=False):
-        """Set the stored value.
-
-        For N the number of bits, valid inputs are integer numbers x where
-        -B <= x < B, with B = 2^(N-1) the largest absolute value.
-        """
-        if not ideal:
-            try:
-                input_overflow = _test_overflow(value, self._bits)
-            except TypeError:
-                raise
-            if input_overflow:
-                raise ValueError("input overflow")
+        """Set the stored value."""
         self._value = value
     
     def get_output(self, ideal=False, verbose=False):
-        """Return the stored value."""
-        value = self._value
+        """Return the stored value using saturation."""
+        V = self._value
         if not ideal:
-            value = int(value)
+            value = _saturate(int(V), self._bits)
+        else:
+            value = V
         if verbose:
-            msg = 'returning %i' % value
+            if V != value:
+                msg = 'OVERFLOW: %i saturated to %i' % (V, value)
+            else:
+                msg = 'returning %i' % value
             return (value, msg)
         else:
             return value
