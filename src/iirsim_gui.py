@@ -135,9 +135,16 @@ class InputSettings(QtGui.QWidget):
 
         self.file_select = FileSelect('pulse file')
 
+        self.input_norm = QtGui.QCheckBox('Input is normalized')
+        self.input_norm.setChecked(True)
+        self.file_select.layout().itemAt(1).layout().insertWidget( \
+            0, self.input_norm)
+
         self.connect(self.dropdown, QtCore.SIGNAL('currentIndexChanged(int)'), \
                      self._signalChanged)
         self.connect(self.file_select, QtCore.SIGNAL('editingFinished()'), \
+                     self._signalChanged)
+        self.connect(self.input_norm, QtCore.SIGNAL('stateChanged(int)'), \
                      self._signalChanged)
 
         vbox = QtGui.QVBoxLayout()
@@ -153,17 +160,21 @@ class InputSettings(QtGui.QWidget):
         else:
             pulse_type = 'unit'
         pulse_file = self.file_select.text()
+        norm = self.input_norm.isChecked()
         return dict([ \
             ['pulse_type', pulse_type], \
-            ['pulse_file', pulse_file]])
+            ['pulse_file', pulse_file], \
+            ['input_norm', norm]])
 
     def _signalChanged(self):
         pulse_type = self.get_settings()['pulse_type']
         if pulse_type == 'unit':
             self.file_select.setEnabled(False)
+            self.input_norm.setEnabled(False)
             self.emit(QtCore.SIGNAL('valueChanged()'))
         else:
             self.file_select.setEnabled(True)
+            self.input_norm.setEnabled(True)
             if self.file_select.text():
                 self.emit(QtCore.SIGNAL('valueChanged()'))
             
@@ -341,15 +352,63 @@ class FilterSettings(QtGui.QWidget):
 # Plot options
 #--------------------------------------------------
 
+class logAxes(QtGui.QWidget):
+    def __init__(self):
+        QtGui.QWidget.__init__(self)
+        self.logx_pulse = QtGui.QCheckBox('horizontal')
+        self.logy_pulse = QtGui.QCheckBox('vertical')
+        self.logx_spectrum = QtGui.QCheckBox('horizontal')
+        self.logy_spectrum = QtGui.QCheckBox('vertical')
+
+        grid = QtGui.QGridLayout()
+        grid.addWidget(QtGui.QLabel('Logarithmic pulse plot'), 0, 0)
+        grid.addWidget(QtGui.QLabel('Logarithmic spectrum plot'), 1, 0)
+        grid.addWidget(self.logx_pulse, 0, 1)
+        grid.addWidget(self.logy_pulse, 0, 2)
+        grid.addWidget(self.logx_spectrum, 1, 1)
+        grid.addWidget(self.logy_spectrum, 1, 2)
+        grid.setMargin(0)
+        self.setLayout(grid)
+
+        self.connect(self.logx_pulse, QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalStateChanged)
+        self.connect(self.logy_pulse, QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalStateChanged)
+        self.connect(self.logx_spectrum, QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalStateChanged)
+        self.connect(self.logy_spectrum, QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalStateChanged)
+
+    def isChecked(self):
+        return [box.isChecked() for box in [self.logx_pulse, \
+                                            self.logy_pulse, \
+                                            self.logx_spectrum, \
+                                            self.logy_spectrum]]
+
+    def setChecked(self, state):
+        for (i, box) in enumerate([self.logx_pulse, self.logy_pulse, \
+                                   self.logx_spectrum, self.logy_spectrum]):
+            box.setChecked(state[i])
+
+    def _signalStateChanged(self):
+        self.emit(QtCore.SIGNAL('stateChanged()'))
+
+
 class plotOptions(QtGui.QWidget):
     def __init__(self, samples=128, rate=44100, show_time=False):
         QtGui.QWidget.__init__(self)
         self.num_samples_edit = intEdit(8, 8192)
         self.num_samples_edit.setText(str(samples))
-        self.time_checkbox = QtGui.QCheckBox('Show time instead of samples')
-        self.time_checkbox.setChecked(show_time)
         self.sample_rate_edit = floatEdit(1, 1e12)
         self.sample_rate_edit.setText(str(rate))
+        self.time_checkbox = QtGui.QCheckBox('Show time instead of samples')
+        self.time_checkbox.setChecked(show_time)
+        self.spectrum_norm = QtGui.QCheckBox('Normalize frequency spectrum')
+        self.spectrum_norm.setChecked(True)
+
+        self.logaxes = logAxes()
+        self.logaxes.setChecked([False, False, True, True])
+
         grid = QtGui.QGridLayout()
         grid.addWidget(QtGui.QLabel('Samples'),     0, 0)
         grid.addWidget(self.num_samples_edit,       0, 1)
@@ -357,18 +416,24 @@ class plotOptions(QtGui.QWidget):
         grid.addWidget(QtGui.QLabel('Hz'),          1, 2)
         grid.addWidget(self.sample_rate_edit,       1, 1)
         grid.addWidget(self.time_checkbox,          2, 0, 1, 2)
+        grid.addWidget(self.spectrum_norm,          3, 0, 1, 2)
+        grid.addWidget(self.logaxes,                4, 0, 2, 2)
         self.setLayout(grid)
 
         self.connect(self.num_samples_edit, \
                      QtCore.SIGNAL('editingFinished()'), \
                      self._signalEditingFinished)
-            
         self.connect(self.sample_rate_edit, \
                      QtCore.SIGNAL('editingFinished()'), \
                      self._signalEditingFinished)
-
         self.connect(self.time_checkbox, \
                      QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalEditingFinished)
+        self.connect(self.spectrum_norm, \
+                     QtCore.SIGNAL('stateChanged(int)'), \
+                     self._signalEditingFinished)
+        self.connect(self.logaxes, \
+                     QtCore.SIGNAL('stateChanged()'), \
                      self._signalEditingFinished)
 
     def _signalEditingFinished(self):
@@ -378,10 +443,18 @@ class plotOptions(QtGui.QWidget):
         num_samples = int(self.num_samples_edit.text())
         sample_rate = float(self.sample_rate_edit.text())
         time_checked = self.time_checkbox.isChecked()
+        spectrum_norm = self.spectrum_norm.isChecked()
+        [logx_pulse, logy_pulse, logx_spectrum, logy_spectrum] = \
+            self.logaxes.isChecked()
         return dict([ \
             ['num_samples', num_samples], \
             ['sample_rate', sample_rate], \
-            ['time_checked', time_checked] ])
+            ['time_checked', time_checked], \
+            ['spectrum_norm', spectrum_norm], \
+            ['logx_pulse', logx_pulse], \
+            ['logy_pulse', logy_pulse], \
+            ['logx_spectrum', logx_spectrum], \
+            ['logy_spectrum', logy_spectrum] ])
 
 
 #--------------------------------------------------
@@ -395,13 +468,19 @@ class Plot(Qwt5.QwtPlot):
         self.setMinimumHeight(200)
         self.setCanvasBackground(QtGui.QColor(QtCore.Qt.white))
         self.setCanvasLineWidth(1)
-        self.setTitle(title)
+        #self.setTitle(title)
 
         self.grid = Qwt5.QwtPlotGrid()
         self.grid.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0, alpha=32)))
         self.grid.attach(self)
 
         self.curves = []
+
+    def setLogScale(self, axis):
+        self.setAxisScaleEngine(axis, Qwt5.QwtLog10ScaleEngine())
+
+    def setLinScale(self, axis):
+        self.setAxisScaleEngine(axis, Qwt5.QwtLinearScaleEngine())
 
     def plot(self, data, colors=None):
         # detach old curves from plot
@@ -431,14 +510,8 @@ class FilterResponsePlot(QtGui.QWidget):
         xaxis = Qwt5.QwtPlot.xBottom
         yaxis = Qwt5.QwtPlot.yLeft
         self.impulse_plot = Plot('Impulse response')
-        self.impulse_plot.setAxisScale(yaxis, -1, 1)
-        self.impulse_plot.setAxisTitle(yaxis, 'Amplitude')
         self.frequency_plot = Plot('Frequency response')
-        self.frequency_plot.setAxisScale(yaxis, -30, 30)
-        self.frequency_plot.setAxisScaleEngine(xaxis, \
-                                Qwt5.QwtLog10ScaleEngine())
         self.frequency_plot.setAxisTitle(xaxis, 'Frequency / Hz')
-        self.frequency_plot.setAxisTitle(yaxis, 'Gain / dB')
 
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.impulse_plot, 1)
@@ -447,14 +520,23 @@ class FilterResponsePlot(QtGui.QWidget):
 
     def replot(self, data, options):
         use_unit_pulse = (data is None)
-        length = options['num_samples']
-        fs = options['sample_rate']
-        time = options['time_checked']
+
+        length        = options['num_samples']
+        fs            = options['sample_rate']
+        time          = options['time_checked']
+        spectrum_norm = options['spectrum_norm']
+        input_norm    = options['input_norm']
+        logx_pulse    = options['logx_pulse']
+        logy_pulse    = options['logy_pulse']
+        logx_spectrum = options['logx_spectrum']
+        logy_spectrum = options['logy_spectrum']
+
         duration = (length-1)/fs
         fftlen = (length+1)/2
         t = numpy.arange(length)
         f = numpy.linspace(1, fftlen, fftlen)*fs/2/fftlen
-        axis = Qwt5.QwtPlot.xBottom
+        xaxis = Qwt5.QwtPlot.xBottom
+        yaxis = Qwt5.QwtPlot.yLeft
 
         if time:
             prefix = ''
@@ -467,37 +549,80 @@ class FilterResponsePlot(QtGui.QWidget):
             if 10*duration < 1:
                 duration = 1000*duration
                 prefix = 'n'
-            self.impulse_plot.setAxisScale(axis, 0, duration)
-            self.impulse_plot.setAxisTitle(axis, 'Time / %ss' % prefix)
             t = t*duration/(length-1)
+            self.impulse_plot.setAxisTitle(xaxis, 'Time / %ss' % prefix)
         else:
-            self.impulse_plot.setAxisScale(axis, 0, length-1)
-            self.impulse_plot.setAxisTitle(axis, 'Samples')
+            self.impulse_plot.setAxisTitle(xaxis, 'Samples')
 
         if use_unit_pulse:
-            x = self.filt.unit_pulse(length, norm=True)
+            x = numpy.array(self.filt.unit_pulse(length, norm=True))
         else:
             x = data
-        while len(x) < length:
-            x.append(0.0)
+            while len(x) < length:
+                x.append(0.0)
+            x = numpy.array(x)
+            if not input_norm:
+                B = 1 << self.filt.bits()-1
+                x /= B
 
         [y_id, y] = [numpy.array( \
                      self.filt.response(x, length, True, ideal)) \
                      for ideal in [True, False]]
 
-        X = 20*numpy.log10(numpy.abs(numpy.fft.fft(x)[1:fftlen]))
+        X = numpy.abs(numpy.fft.fft(x)[1:fftlen])
         [Y_id, Y] = \
-            [20*numpy.log10(numpy.abs(numpy.fft.fft(data)[1:fftlen])) - X \
-             for data in [y_id, y]]
+            [numpy.abs(numpy.fft.fft(data)[1:fftlen]) for data in [y_id, y]]
+        if spectrum_norm:
+            Y_id = Y_id/X
+            Y    = Y   /X
 
-        colors = [QtCore.Qt.black, QtCore.Qt.gray, QtCore.Qt.blue]
         impulse_plot_data = [[t, y], [t, y_id]]
         frequency_plot_data = [[f, Y], [f, Y_id]]
         if not use_unit_pulse:
             impulse_plot_data.append([t, x])
+        if not spectrum_norm:
+            frequency_plot_data.append([f, X])
 
+        if logx_pulse:
+            self.impulse_plot.setLogScale(xaxis)
+            self.impulse_plot.setAxisScale(xaxis, t[1], t[length-1])
+        else:
+            self.impulse_plot.setLinScale(xaxis)
+            self.impulse_plot.setAxisScale(xaxis, 0, t[length-1])
+
+        if logx_spectrum:
+            self.frequency_plot.setLogScale(xaxis)
+            self.frequency_plot.setAxisScale(xaxis, fs/200, fs/2)
+        else:
+            self.frequency_plot.setLinScale(xaxis)
+            self.frequency_plot.setAxisScale(xaxis, 0, fs/2)
+
+        if logy_pulse:
+            minval = 1.0 / 2**(self.filt.bits()-1)
+            self.impulse_plot.setAxisScale(yaxis, 20*numpy.log10(minval), 0)
+            self.impulse_plot.setAxisTitle(yaxis, 'Signal amplitude / dBFS')
+            for (i, data) in enumerate(impulse_plot_data):
+                d = data[1]
+                for j in range(len(d)):
+                    if d[j] <= 0:
+                        d[j] = minval
+                impulse_plot_data[i][1] = 20*numpy.log10(d)
+        else:
+            self.impulse_plot.setAxisScale(yaxis, -1, 1)
+            self.impulse_plot.setAxisTitle(yaxis, 'Signal amplitude')
+
+        if logy_spectrum:
+            self.frequency_plot.setAxisScale(yaxis, -30, 30)
+            self.frequency_plot.setAxisTitle(yaxis, 'Magnitude / dB')
+            for (i, data) in enumerate(frequency_plot_data):
+                d = data[1]
+                frequency_plot_data[i][1] = 20*numpy.log10(d)
+        else:
+            self.frequency_plot.setAxisScale(yaxis, 0, 30)
+            self.frequency_plot.setAxisTitle(yaxis, 'Magnitude') # TODO title
+
+        colors = [QtCore.Qt.black, QtCore.Qt.gray, QtCore.Qt.blue]
         self.impulse_plot.plot(impulse_plot_data, colors)
-        self.frequency_plot.setAxisScale(axis, fs/200, fs/2)
         self.frequency_plot.plot(frequency_plot_data, colors)
 
         self.impulse_plot.replot()
@@ -575,6 +700,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         input_settings = self.input_settings.get_settings()
         pulse_type = input_settings['pulse_type']
         pulse_file = input_settings['pulse_file']
+        input_norm = input_settings['input_norm']
 
         data = None
         input_valid = True
@@ -589,6 +715,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         if input_valid:
             self.input_data = data
+            self.input_norm = input_norm
             self._setControlsEnabled(True)
             self.status_bar.clearMessage()
             self._updatePlot()
@@ -603,11 +730,11 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         data = self.input_data
         options = self.plot_options.get_options()
+        options['input_norm'] = self.input_norm
         try:
-            self._setControlsEnabled(True)
+            self.status_bar.clearMessage()
             self.plot_area.replot(data, options)
         except ValueError as (msg, ):
-            self._setControlsEnabled(False)
             self.status_bar.showMessage('Error: %s' % msg)
         
 
