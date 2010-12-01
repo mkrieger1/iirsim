@@ -69,16 +69,18 @@ class LineEditDnD(QtGui.QLineEdit):
         self.setText(os.path.realpath(filename))
 
 class FileSelect(QtGui.QWidget):
-    def __init__(self, what):
+    def __init__(self, what, loadtext, savetext):
         QtGui.QWidget.__init__(self)
         self.filename_edit = LineEditDnD()
         self.filename_edit.setToolTip('Enter path to %s' % what)
+        self.loadtext = loadtext
+        self.savetext = savetext
 
         self.loadbutton = QtGui.QPushButton('Load...')
         self.savebutton = QtGui.QPushButton('Save...')
-        self.loadbutton.setToolTip('Load custom pulse from file')
-        self.savebutton.setToolTip('Save filtered pulse to file')
-        self.last_path = os.path.expanduser('~')
+        self.loadbutton.setToolTip(self.loadtext)
+        self.savebutton.setToolTip(self.savetext)
+        self.last_path = os.path.abspath(os.path.expanduser('~'))
 
         self.connect(self.loadbutton, QtCore.SIGNAL('clicked()'), \
             self._select_load_file)
@@ -102,7 +104,7 @@ class FileSelect(QtGui.QWidget):
  
     def _select_load_file(self):
         filename = QtGui.QFileDialog.getOpenFileName(self, \
-            caption = 'Load custom pulse from file', \
+            caption = self.loadtext, \
             #filter = 'Text files (*.txt);;All Files (*.*)', \
             directory = self.last_path)
         if filename: # False if dialog is cancelled
@@ -112,7 +114,7 @@ class FileSelect(QtGui.QWidget):
  
     def _select_save_file(self):
         filename = QtGui.QFileDialog.getSaveFileName(self, \
-            caption = 'Save filtered pulse to file', \
+            caption = self.savetext, \
             #filter = 'Text files (*.txt);;All Files (*.*)', \
             directory = self.last_path)
         if filename: # False if dialog is cancelled
@@ -133,7 +135,8 @@ class InputSettings(QtGui.QWidget):
         self.dropdown = QtGui.QComboBox()
         self.dropdown.addItems(['Unit pulse', 'Custom pulse'])
 
-        self.file_select = FileSelect('pulse file')
+        self.file_select = FileSelect('input data file', \
+            'Load pulse from file', 'Save filtered pulse to file')
 
         self.input_norm = QtGui.QCheckBox('Input is normalized')
         self.input_norm.setChecked(True)
@@ -159,7 +162,8 @@ class InputSettings(QtGui.QWidget):
             pulse_type = 'custom'
         else:
             pulse_type = 'unit'
-        pulse_file = self.file_select.text()
+        pulse_file = os.path.abspath(os.path.expanduser( \
+            str(self.file_select.text())) )
         norm = self.input_norm.isChecked()
         return dict([ \
             ['pulse_type', pulse_type], \
@@ -297,10 +301,13 @@ class FactorSliderGrid(QtGui.QWidget):
             gridLayout.addWidget(factorSlider.spinBox,    row, 3)
             self.connect(factorSlider, QtCore.SIGNAL('valueChanged()'), \
                          self._signalValueChanged)
-        minLabelWidth = max([slider._getMinLabelWidth() \
-                             for slider in self.factorSliders.itervalues()])
-        gridLayout.setColumnMinimumWidth(1, 50)
-        gridLayout.setColumnMinimumWidth(2, minLabelWidth)
+
+        if factor_dict:
+            minLabelWidth = max([slider._getMinLabelWidth() \
+                                 for slider in self.factorSliders.itervalues()])
+            gridLayout.setColumnMinimumWidth(1, 50)
+            gridLayout.setColumnMinimumWidth(2, minLabelWidth)
+
         gridLayout.setMargin(0)
         self.setLayout(gridLayout)
 
@@ -312,41 +319,82 @@ class FactorSliderGrid(QtGui.QWidget):
                      for name in self.factorSliders.iterkeys()])
 
 class FilterSettings(QtGui.QWidget):
-    def __init__(self, iirfilter):
+    def __init__(self, filename):
         QtGui.QWidget.__init__(self)
-        factors     = iirfilter.factors()
-        bits        = iirfilter.bits()
-        factor_bits = iirfilter.factor_bits()
-        norm_bits  = iirfilter.norm_bits()
 
+        self.last_filename = os.path.abspath(os.path.expanduser(filename))
+
+        self.filter_select = FileSelect('filter definition file', \
+            'Load filter from file', 'Save filter to file')
+        self.filter_select.filename_edit.setText(filename)
         self.bits_edit = intEdit(2, 32)
-        self.bits_edit.setText(str(bits))
+        self.bits_edit_label = QtGui.QLabel('Bits')
+        self.sliders = FactorSliderGrid({}, {}, None)
 
-        self.sliders = FactorSliderGrid(factors, factor_bits, norm_bits)
-
-        self.connect(self.sliders, QtCore.SIGNAL('valueChanged()'), \
-                     self._signalValueChanged)
+        self.connect(self.filter_select, QtCore.SIGNAL('editingFinished()'), \
+                     self._signalFilterChanged)
         self.connect(self.bits_edit, QtCore.SIGNAL('editingFinished()'), \
                      self._signalValueChanged)
+        self.connect(self.sliders, QtCore.SIGNAL('valueChanged()'), \
+                     self._signalValueChanged)
 
-        settings_grid = QtGui.QGridLayout()
-        settings_grid.addWidget(QtGui.QLabel('Bits'), 0, 0)
-        settings_grid.addWidget(self.bits_edit,       0, 1)
+        self.filter_select.layout().itemAt(1).layout().insertWidget( \
+            0, self.bits_edit)
+        self.filter_select.layout().itemAt(1).layout().insertWidget( \
+            0, self.bits_edit_label)
 
-        vbox = QtGui.QVBoxLayout()
-        vbox.addLayout(settings_grid)
-        vbox.addWidget(self.sliders)
-
-        self.setLayout(vbox)
+        self.vbox = QtGui.QVBoxLayout()
+        self.vbox.addWidget(self.filter_select)
+        self.vbox.addWidget(self.sliders)
+        self.setLayout(self.vbox)
 
     def _signalValueChanged(self):
+        self._updateFilter()
         self.emit(QtCore.SIGNAL('valueChanged()'))
 
-    def get_settings(self):
+    def _signalFilterChanged(self):
+        filename = os.path.abspath(os.path.expanduser( \
+            str(self.filter_select.text())) )
+        if filename:
+            if not os.path.isfile(filename):
+                raise IOError('File "%s" does not exist' % filename)
+            if not filename == self.last_filename:
+                self.last_filename = filename
+                self.emit(QtCore.SIGNAL('filterChanged()'))
+
+    def load_filter(self):
+        try:
+            self.filt = iirsim_cfg.read_config(self.last_filename)
+        except IOError as (msg, ): # TODO raise Exceptions in read_config
+            self.bits_edit.setEnabled(False)
+            self.bits_edit_label.setEnabled(False)
+            self.sliders.setEnabled(False)
+            raise
+
+        factors     = self.filt.factors()
+        bits        = self.filt.bits()
+        factor_bits = self.filt.factor_bits()
+        norm_bits   = self.filt.norm_bits()
+
+        self.bits_edit.setText(str(bits))
+
+        # destroy old and create new sliders (TODO better solution?)
+        self.sliders.setParent(None)
+        self.sliders.deleteLater()
+        self.sliders = FactorSliderGrid(factors, factor_bits, norm_bits)
+        self.connect(self.sliders, QtCore.SIGNAL('valueChanged()'), \
+                     self._signalValueChanged)
+        self.vbox.addWidget(self.sliders)
+
+    def _updateFilter(self):
         bits = int(self.bits_edit.text())
         factors = self.sliders.getValues()
-        return dict([['bits',    bits], \
-                     ['factors', factors]])
+        for (name, value) in factors.iteritems():
+            self.filt.set_factor(name, value)
+        self.filt.set_bits(bits)
+
+    def get_filter(self):
+        return self.filt
 
 #--------------------------------------------------
 # Plot options
@@ -504,9 +552,8 @@ class Plot(Qwt5.QwtPlot):
             curve.attach(self)
 
 class FilterResponsePlot(QtGui.QWidget):
-    def __init__(self, iirfilter):
+    def __init__(self):
         QtGui.QWidget.__init__(self)
-        self.filt = iirfilter
         xaxis = Qwt5.QwtPlot.xBottom
         yaxis = Qwt5.QwtPlot.yLeft
         self.impulse_plot = Plot('Impulse response')
@@ -518,7 +565,7 @@ class FilterResponsePlot(QtGui.QWidget):
         vbox.addWidget(self.frequency_plot, 1)
         self.setLayout(vbox)
 
-    def replot(self, data, options):
+    def replot(self, data, filt, options):
         use_unit_pulse = (data is None)
 
         length        = options['num_samples']
@@ -555,18 +602,18 @@ class FilterResponsePlot(QtGui.QWidget):
             self.impulse_plot.setAxisTitle(xaxis, 'Samples')
 
         if use_unit_pulse:
-            x = numpy.array(self.filt.unit_pulse(length, norm=True))
+            x = numpy.array(filt.unit_pulse(length, norm=True))
         else:
             x = data
             while len(x) < length:
                 x.append(0.0)
             x = numpy.array(x)
             if not input_norm:
-                B = 1 << self.filt.bits()-1
+                B = 1 << filt.bits()-1
                 x /= B
 
         [y_id, y] = [numpy.array( \
-                     self.filt.response(x, length, True, ideal)) \
+                     filt.response(x, length, True, ideal)) \
                      for ideal in [True, False]]
 
         X = numpy.abs(numpy.fft.fft(x)[1:fftlen])
@@ -598,7 +645,7 @@ class FilterResponsePlot(QtGui.QWidget):
             self.frequency_plot.setAxisScale(xaxis, 0, fs/2)
 
         if logy_pulse:
-            minval = 1.0 / 2**(self.filt.bits()-1)
+            minval = 1.0 / 2**(filt.bits()-1)
             self.impulse_plot.setAxisScale(yaxis, 20*numpy.log10(minval), 0)
             self.impulse_plot.setAxisTitle(yaxis, 'Signal amplitude / dBFS')
             for (i, data) in enumerate(impulse_plot_data):
@@ -641,13 +688,6 @@ class IIRSimCentralWidget(QtGui.QWidget):
         if status_bar is not None:
             self.status_bar = status_bar
 
-        # read config, create filter and get names
-        cfgfile = '../filters/directForm2.txt'
-        self.filt = iirsim_cfg.read_config(cfgfile)
-        factor_dict = self.filt.factors()
-        factor_bits = self.filt.factor_bits()
-        norm_bits = self.filt.norm_bits()
-
         # Input Data Settings
         self.input_settings = InputSettings()
         self.input_settings_groupbox = QtGui.QGroupBox('Input data')
@@ -655,7 +695,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.input_data = None
 
         # Factor Slider Array
-        self.filter_settings = FilterSettings(self.filt)
+        self.filter_settings = FilterSettings( \
+            '/home/michael/Studium/diplom/code/iirsim/filters/directForm2.txt')
         self.filter_settings_groupbox = QtGui.QGroupBox('Filter settings')
         self.filter_settings_groupbox.setLayout(self.filter_settings.layout())
 
@@ -665,7 +706,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.plot_options_groupbox.setLayout(self.plot_options.layout())
 
         # Plot Area
-        self.plot_area = FilterResponsePlot(self.filt)
+        self.plot_area = FilterResponsePlot()
 
         # Global Layout
         controlVBox = QtGui.QVBoxLayout()
@@ -681,6 +722,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.setLayout(globalHBox)
 
         # connect signals
+        self.connect(self.filter_settings, QtCore.SIGNAL('filterChanged()'), \
+                     self._updateFilter)
         self.connect(self.input_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updateInput)
         self.connect(self.filter_settings, QtCore.SIGNAL('valueChanged()'), \
@@ -689,13 +732,26 @@ class IIRSimCentralWidget(QtGui.QWidget):
                      self._updatePlot)
 
         # read input data and plot once
-        self._updateInput()
-
-    def _setControlsEnabled(self, enabled):
-        self.filter_settings_groupbox.setEnabled(enabled)
-        self.plot_options_groupbox.setEnabled(enabled)
+        self._updateFilter()
 
     # slots
+    def _updateFilter(self):
+        filter_valid = True
+
+        try:
+            self.filter_settings.load_filter()
+        except IOError as (msg, ):
+            filter_valid = False
+            self.input_settings_groupbox.setEnabled(False)
+            self.plot_options_groupbox.setEnabled(False)
+            self.status_bar.showMessage('Error: %s' % msg)
+
+        if filter_valid:
+            self.input_settings_groupbox.setEnabled(True)
+            self.plot_options_groupbox.setEnabled(True)
+            self.status_bar.clearMessage()
+            self._updateInput()
+
     def _updateInput(self):
         input_settings = self.input_settings.get_settings()
         pulse_type = input_settings['pulse_type']
@@ -710,30 +766,26 @@ class IIRSimCentralWidget(QtGui.QWidget):
                 data = iirsim_cfg.read_data(pulse_file)
             except IOError as (msg, ):
                 input_valid = False
-                self._setControlsEnabled(False)
+                self.filter_settings_groupbox.setEnabled(False)
+                self.plot_options_groupbox.setEnabled(False)
                 self.status_bar.showMessage('Error: %s' % msg)
 
         if input_valid:
             self.input_data = data
             self.input_norm = input_norm
-            self._setControlsEnabled(True)
+            self.filter_settings_groupbox.setEnabled(True)
+            self.plot_options_groupbox.setEnabled(True)
             self.status_bar.clearMessage()
             self._updatePlot()
 
     def _updatePlot(self):
-        filter_settings = self.filter_settings.get_settings()
-        coefficients = filter_settings['factors']
-        bits = filter_settings['bits']
-        for (name, value) in coefficients.iteritems():
-            self.filt.set_factor(name, value)
-        self.filt.set_bits(bits)
-
         data = self.input_data
+        filt = self.filter_settings.get_filter()
         options = self.plot_options.get_options()
         options['input_norm'] = self.input_norm
         try:
             self.status_bar.clearMessage()
-            self.plot_area.replot(data, options)
+            self.plot_area.replot(data, filt, options)
         except ValueError as (msg, ):
             self.status_bar.showMessage('Error: %s' % msg)
         

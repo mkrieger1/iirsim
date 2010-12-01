@@ -1,6 +1,6 @@
 bits_global        32
 factor_bits_global  9
-scale_bits_global   7
+norm_bits_global   7
 
 node Const,    name "const_in",                      input
 node Multiply, name "a",     connect "const_in"
