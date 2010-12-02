@@ -1,0 +1,37 @@
+# 2nd order direct form II
+#
+#                        b0 
+# x[n] ----->(+)------+----->(+)-----> y[n]
+#             A       |       A
+#             |       V       |
+#             |     [z-1]     |
+#             |       |       |
+#             |   a1  |  b1   |
+#            (+)<-----+----->(+)
+#             A       |       A
+#             |       V       |
+#             |     [z-1]     |
+#             |       |       |
+#             |   a2  |  b2   |
+#             +-------+-------+
+#
+# y[n] = a1 y[n-1] + a2 y[n-2] + b0 x[n] + b1 x[n-1] + b2 x[n-2]
+
+
+bits_global        12
+factor_bits_global 10
+norm_bits_global   9
+
+node Const,    name "const",                         input
+node Add,      name "add1",   connect "const" "add3"
+node Add,      name "add2",   connect "b0" "add4",   output
+node Add,      name "add3",   connect "a1" "a2"
+node Add,      name "add4",   connect "b1" "b2"
+node Delay,    name "delay1", connect "add1"
+node Delay,    name "delay2", connect "delay1"
+node Multiply, name "b0",     connect "add1",        factor 0.9
+node Multiply, name "b1",     connect "delay1"
+node Multiply, name "b2",     connect "delay2"
+node Multiply, name "a1",     connect "delay1"
+node Multiply, name "a2",     connect "delay2"
+
