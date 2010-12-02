@@ -192,16 +192,18 @@ class InputSettings(QtGui.QWidget):
     def _signalChanged(self):
         pulse_type = self.get_settings()['pulse_type']
         if pulse_type == 'unit':
-            self.file_select.setEnabled(False)
-            self.input_norm.setEnabled(False)
-            self.input_shift.setEnabled(False)
-            self.input_shift_label.setEnabled(False)
+            self.file_select.hide()
+            self.input_norm.hide()
+            self.input_shift.hide()
+            self.input_shift_label.hide()
             self.emit(QtCore.SIGNAL('valueChanged()'))
         else:
-            self.file_select.setEnabled(True)
-            self.input_norm.setEnabled(True)
             self.input_shift.setEnabled(not self.input_norm.isChecked())
             self.input_shift_label.setEnabled(not self.input_norm.isChecked())
+            self.file_select.show()
+            self.input_norm.show()
+            self.input_shift.show()
+            self.input_shift_label.show()
             if self.file_select.text():
                 self.emit(QtCore.SIGNAL('valueChanged()'))
             
@@ -733,17 +735,25 @@ class IIRSimCentralWidget(QtGui.QWidget):
         # Plot Area
         self.plot_area = FilterResponsePlot()
 
-        # Global Layout
+        # Layout
         controlVBox = QtGui.QVBoxLayout()
         controlVBox.addWidget(self.input_settings_groupbox, 0)
         controlVBox.addWidget(self.filter_settings_groupbox, 0)
         controlVBox.addWidget(self.plot_options_groupbox, 0)
         controlVBox.addStretch(1)
+        controlWidget = QtGui.QWidget()
+        controlWidget.setLayout(controlVBox)
+        controlScroll = QtGui.QScrollArea()
+        controlScroll.setWidget(controlWidget)
+        controlScroll.setMinimumWidth( \
+            controlWidget.sizeHint().width() + \
+            controlScroll.verticalScrollBar().sizeHint().width())
+        controlScroll.setHorizontalScrollBarPolicy(1) # 1 == no scrollbar
+        controlScroll.setWidgetResizable(True)
 
         globalHBox = QtGui.QHBoxLayout()
-        globalHBox.addLayout(controlVBox, 1)
-        globalHBox.addStretch(0)
-        globalHBox.addWidget(self.plot_area, 2)
+        globalHBox.addWidget(controlScroll, 0) # don't resize
+        globalHBox.addWidget(self.plot_area, 1) # do resize
         self.setLayout(globalHBox)
 
         # connect signals
