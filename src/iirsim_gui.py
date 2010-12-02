@@ -227,6 +227,7 @@ class FactorSlider(QtGui.QWidget):
 
         # spinbox
         self.spinBox = QtGui.QDoubleSpinBox()
+        self.spinBox.setAlignment(QtCore.Qt.AlignRight)
         self.spinBox.setMinimum(float(self.slider.minimum())/self.norm)
         self.spinBox.setMaximum(float(self.slider.maximum())/self.norm)
         self.spinBox.setSingleStep(1.0/self.norm)
@@ -327,13 +328,15 @@ class FilterSettings(QtGui.QWidget):
         self.filter_select = FileSelect('filter definition file', \
             'Load filter from file', 'Save filter to file')
         self.filter_select.filename_edit.setText(filename)
-        self.bits_edit = intEdit(2, 32)
+        self.bits_edit = QtGui.QSpinBox()
+        self.bits_edit.setAlignment(QtCore.Qt.AlignRight)
+        self.bits_edit.setRange(2, 32)
         self.bits_edit_label = QtGui.QLabel('Bits')
         self.sliders = FactorSliderGrid({}, {}, None)
 
         self.connect(self.filter_select, QtCore.SIGNAL('editingFinished()'), \
                      self._signalFilterChanged)
-        self.connect(self.bits_edit, QtCore.SIGNAL('editingFinished()'), \
+        self.connect(self.bits_edit, QtCore.SIGNAL('valueChanged(int)'), \
                      self._signalValueChanged)
         self.connect(self.sliders, QtCore.SIGNAL('valueChanged()'), \
                      self._signalValueChanged)
@@ -373,7 +376,7 @@ class FilterSettings(QtGui.QWidget):
         factor_bits = self.filt.factor_bits()
         norm_bits   = self.filt.norm_bits()
 
-        self.bits_edit.setText(str(bits))
+        self.bits_edit.setValue(bits)
         self.bits_edit.setEnabled(True)
         self.bits_edit_label.setEnabled(True)
 
@@ -386,7 +389,7 @@ class FilterSettings(QtGui.QWidget):
         self.vbox.addWidget(self.sliders)
 
     def _updateFilter(self):
-        bits = int(self.bits_edit.text())
+        bits = self.bits_edit.value()
         factors = self.sliders.getValues()
         for (name, value) in factors.iteritems():
             self.filt.set_factor(name, value)
@@ -692,6 +695,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.input_settings_groupbox = QtGui.QGroupBox('Input data')
         self.input_settings_groupbox.setLayout(self.input_settings.layout())
         self.input_data = None
+        self.input_norm = self.input_settings.get_settings()['input_norm']
 
         # Factor Slider Array
         self.filter_settings = FilterSettings( \
