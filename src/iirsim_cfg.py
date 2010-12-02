@@ -4,9 +4,16 @@ import iirsim_lib
 def read_config(filename):
     """Read configuration file and return a filter."""
     # parse config file
+    if not os.path.isfile(filename):
+        raise IOError('File "%s" does not exist' % filename)
+    try:
+        f = open(filename)
+    except IOError:
+        raise IOError('Could not open file "%s"' % filename)
+
     cfg_items = []
-    with open(filename) as f:
-        for line in f:
+    for (i, line) in enumerate(f):
+        try:
             # remove all comments and unnecessary whitespace
             normalizer = shlex.shlex(line)
             normalizer.wordchars += '.'
@@ -20,6 +27,9 @@ def read_config(filename):
                     value = cfg_split
                     cfg_item[key] = value
                 cfg_items.append(cfg_item)
+        except (IndexError, ValueError):
+            raise RuntimeError( \
+                'Could not parse line %i of file "%s"' % (i, filename))
 
     # look for global bit settings
     bits_global        = None
@@ -32,21 +42,21 @@ def read_config(filename):
                 bits_global = int(bits_global)
             else:
                 raise RuntimeError( \
-                    'bits_global must not be specified more than once.')
+                    'bits_global must not be specified more than once')
         if 'factor_bits_global' in cfg_item:
             if factor_bits_global is None:
                 [factor_bits_global] = cfg_item.pop('factor_bits_global')
                 factor_bits_global = int(factor_bits_global)
             else:
                 raise RuntimeError( \
-                    'factor_bits_global must not be specified more than once.')
+                    'factor_bits_global must not be specified more than once')
         if 'norm_bits_global' in cfg_item:
             if norm_bits_global is None:
                 [norm_bits_global] = cfg_item.pop('norm_bits_global')
                 norm_bits_global = int(norm_bits_global)
             else:
                 raise RuntimeError( \
-                    'norm_bits_global must not be specified more than once.')
+                    'norm_bits_global must not be specified more than once')
 
     # remove empty items from cfg_items, only node definitions should be left
     cfg_items = filter(None, cfg_items)
@@ -61,14 +71,14 @@ def read_config(filename):
         try:
             [node] = cfg_item['node']
         except KeyError:
-            raise RuntimeError('Node type not specified.')
+            raise RuntimeError('Node type not specified')
         try:
             [name] = cfg_item['name']
         except KeyError:
-            raise RuntimeError('Name not specified.')
+            raise RuntimeError('Name not specified')
         # optional settings
         if 'bits' in cfg_item:
-            [bits] = cfg_item['bits']
+            [bits] = map(int, cfg_item['bits'])
         else:
             bits = bits_global
         if 'connect' in cfg_item:
@@ -79,12 +89,12 @@ def read_config(filename):
             if input_node is None:
                 input_node = name
             else:
-                raise RuntimeError('More than one input node specified.')
+                raise RuntimeError('More than one input node specified')
         if 'output' in cfg_item:
             if output_node is None:
                 output_node = name
             else:
-                raise RuntimeError('More than one output node specified.')
+                raise RuntimeError('More than one output node specified')
 
         # make filter node
         if name not in filter_nodes:
@@ -116,17 +126,17 @@ def read_config(filename):
                 else:
                     raise ValueError('Unknown node type: %s' % node)
             else:
-                raise RuntimeError('Number of bits for node %s not specified.' \
+                raise RuntimeError('Number of bits for node "%s" not specified' \
                                    % name)
             adjacency[name] = connect
         else:
-            raise RuntimeError('Node %s already present.' % name)
+            raise RuntimeError('Node "%s" already present' % name)
 
     # make filter
     if input_node is None:
-        raise RuntimeError('No input node specified.')
+        raise RuntimeError('No input node specified')
     elif output_node is None:
-        raise RuntimeError('No output node specified.')
+        raise RuntimeError('No output node specified')
     else:
         return iirsim_lib.Filter(filter_nodes, adjacency, \
                                  input_node, output_node)

@@ -355,17 +355,14 @@ class FilterSettings(QtGui.QWidget):
     def _signalFilterChanged(self):
         filename = os.path.abspath(os.path.expanduser( \
             str(self.filter_select.text())) )
-        if filename:
-            if not os.path.isfile(filename):
-                raise IOError('File "%s" does not exist' % filename)
-            if not filename == self.last_filename:
-                self.last_filename = filename
-                self.emit(QtCore.SIGNAL('filterChanged()'))
+        if not filename == self.last_filename:
+            self.last_filename = filename
+            self.emit(QtCore.SIGNAL('filterChanged()'))
 
     def load_filter(self):
         try:
             self.filt = iirsim_cfg.read_config(self.last_filename)
-        except IOError as (msg, ): # TODO raise Exceptions in read_config
+        except (IOError, RuntimeError, ValueError) as (msg, ):
             self.bits_edit.setEnabled(False)
             self.bits_edit_label.setEnabled(False)
             self.sliders.setEnabled(False)
@@ -377,6 +374,8 @@ class FilterSettings(QtGui.QWidget):
         norm_bits   = self.filt.norm_bits()
 
         self.bits_edit.setText(str(bits))
+        self.bits_edit.setEnabled(True)
+        self.bits_edit_label.setEnabled(True)
 
         # destroy old and create new sliders (TODO better solution?)
         self.sliders.setParent(None)
@@ -740,7 +739,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         try:
             self.filter_settings.load_filter()
-        except IOError as (msg, ):
+        except (IOError, RuntimeError, ValueError) as (msg, ):
             filter_valid = False
             self.input_settings_groupbox.setEnabled(False)
             self.plot_options_groupbox.setEnabled(False)
