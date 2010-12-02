@@ -80,7 +80,8 @@ class FileSelect(QtGui.QWidget):
         self.savebutton = QtGui.QPushButton('Save...')
         self.loadbutton.setToolTip(self.loadtext)
         self.savebutton.setToolTip(self.savetext)
-        self.last_path = os.path.abspath(os.path.expanduser('~'))
+        #self.last_path = os.path.abspath(os.path.expanduser('~'))
+        self.last_path = os.path.abspath(os.path.expanduser('.'))
 
         self.connect(self.loadbutton, QtCore.SIGNAL('clicked()'), \
             self._select_load_file)
@@ -140,8 +141,12 @@ class InputSettings(QtGui.QWidget):
 
         self.input_norm = QtGui.QCheckBox('Input is normalized')
         self.input_norm.setChecked(True)
-        self.file_select.layout().itemAt(1).layout().insertWidget( \
-            0, self.input_norm)
+
+        self.input_shift = QtGui.QSpinBox()
+        self.input_shift.setRange(-32, 32)
+        self.input_shift.setValue(0)
+        self.input_shift.setAlignment(QtCore.Qt.AlignRight)
+        self.input_shift_label = QtGui.QLabel('Bit shift')
 
         self.connect(self.dropdown, QtCore.SIGNAL('currentIndexChanged(int)'), \
                      self._signalChanged)
@@ -149,10 +154,22 @@ class InputSettings(QtGui.QWidget):
                      self._signalChanged)
         self.connect(self.input_norm, QtCore.SIGNAL('stateChanged(int)'), \
                      self._signalChanged)
+        self.connect(self.input_shift, QtCore.SIGNAL('valueChanged(int)'), \
+                     self._signalChanged)
+
+        # layout
+        self.file_select.layout().itemAt(1).layout().insertWidget( \
+            0, self.input_norm)
+        
+        shift_hbox = QtGui.QHBoxLayout()
+        shift_hbox.addWidget(self.input_shift_label)
+        shift_hbox.addWidget(self.input_shift)
+        shift_hbox.addStretch()
 
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.dropdown)
         vbox.addWidget(self.file_select)
+        vbox.addLayout(shift_hbox)
         self.setLayout(vbox)
 
         self._signalChanged()
@@ -165,20 +182,26 @@ class InputSettings(QtGui.QWidget):
         pulse_file = os.path.abspath(os.path.expanduser( \
             str(self.file_select.text())) )
         norm = self.input_norm.isChecked()
+        shift = self.input_shift.value()
         return dict([ \
             ['pulse_type', pulse_type], \
             ['pulse_file', pulse_file], \
-            ['input_norm', norm]])
+            ['input_norm', norm], \
+            ['input_shift', shift] ])
 
     def _signalChanged(self):
         pulse_type = self.get_settings()['pulse_type']
         if pulse_type == 'unit':
             self.file_select.setEnabled(False)
             self.input_norm.setEnabled(False)
+            self.input_shift.setEnabled(False)
+            self.input_shift_label.setEnabled(False)
             self.emit(QtCore.SIGNAL('valueChanged()'))
         else:
             self.file_select.setEnabled(True)
             self.input_norm.setEnabled(True)
+            self.input_shift.setEnabled(not self.input_norm.isChecked())
+            self.input_shift_label.setEnabled(not self.input_norm.isChecked())
             if self.file_select.text():
                 self.emit(QtCore.SIGNAL('valueChanged()'))
             
@@ -698,8 +721,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.input_norm = self.input_settings.get_settings()['input_norm']
 
         # Factor Slider Array
-        self.filter_settings = FilterSettings( \
-            '/home/michael/Studium/diplom/code/iirsim/filters/directForm2.txt')
+        self.filter_settings = FilterSettings('../filters/directForm2.txt')
         self.filter_settings_groupbox = QtGui.QGroupBox('Filter settings')
         self.filter_settings_groupbox.setLayout(self.filter_settings.layout())
 
@@ -760,6 +782,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         pulse_type = input_settings['pulse_type']
         pulse_file = input_settings['pulse_file']
         input_norm = input_settings['input_norm']
+        input_shift = input_settings['input_shift']
 
         data = None
         input_valid = True
@@ -767,6 +790,11 @@ class IIRSimCentralWidget(QtGui.QWidget):
         if pulse_type == 'custom':
             try:
                 data = iirsim_cfg.read_data(pulse_file)
+                if not input_norm:
+                    for (i, v) in enumerate(data):
+                        data[i] = v * (2**input_shift)
+                        # do not use << because floating point values are
+                        # possible for ideal filter mode
             except IOError as (msg, ):
                 input_valid = False
                 self.filter_settings_groupbox.setEnabled(False)
