@@ -545,9 +545,22 @@ class Plot(Qwt5.QwtPlot):
         self.setCanvasLineWidth(1)
         #self.setTitle(title)
 
+        self.setAxisMaxMinor(Qwt5.QwtPlot.xBottom, 10)
+
         self.grid = Qwt5.QwtPlotGrid()
-        self.grid.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0, alpha=32)))
-        self.grid.attach(self)
+        self.grid.enableXMin(True)
+        self.grid.enableYMin(True)
+        self.grid.setMajPen(QtGui.QPen(QtGui.QColor(224, 224, 224)))
+        self.grid.setMinPen(QtGui.QPen(QtGui.QColor(244, 244, 244)))
+        self.grid.attach(self)                     # alpha --> slow!
+
+        self.picker = Qwt5.QwtPlotPicker( \
+            Qwt5.QwtPlot.xBottom, \
+            Qwt5.QwtPlot.yLeft, \
+            Qwt5.QwtPicker.PointSelection, \
+            Qwt5.QwtPlotPicker.NoRubberBand, \
+            Qwt5.QwtPicker.AlwaysOn, \
+            self.canvas() )
 
         self.curves = []
 
