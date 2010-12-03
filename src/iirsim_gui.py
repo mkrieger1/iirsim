@@ -80,8 +80,8 @@ class FileSelect(QtGui.QWidget):
         self.savebutton = QtGui.QPushButton('Save...')
         self.loadbutton.setToolTip(self.loadtext)
         self.savebutton.setToolTip(self.savetext)
-        #self.last_path = os.path.abspath(os.path.expanduser('~'))
         self.last_path = os.path.abspath(os.path.expanduser('.'))
+        self.save_filename = None
 
         self.connect(self.loadbutton, QtCore.SIGNAL('clicked()'), \
             self._select_load_file)
@@ -120,7 +120,8 @@ class FileSelect(QtGui.QWidget):
             directory = self.last_path)
         if filename: # False if dialog is cancelled
             self.last_path = os.path.dirname(str(filename))
-            print 'saving to %s' % filename #TODO
+            self.save_filename = filename
+            self.emit(QtCore.SIGNAL('saveFileSelected()'))
 
     def _signalEditingFinished(self):
         self.emit(QtCore.SIGNAL('editingFinished()'))
@@ -152,6 +153,8 @@ class InputSettings(QtGui.QWidget):
                      self._signalChanged)
         self.connect(self.file_select, QtCore.SIGNAL('editingFinished()'), \
                      self._signalChanged)
+        self.connect(self.file_select, QtCore.SIGNAL('saveFileSelected()'), \
+                     self._signalSaveClicked)
         self.connect(self.input_norm, QtCore.SIGNAL('stateChanged(int)'), \
                      self._signalChanged)
         self.connect(self.input_shift, QtCore.SIGNAL('valueChanged(int)'), \
@@ -173,6 +176,9 @@ class InputSettings(QtGui.QWidget):
         self.setLayout(vbox)
 
         self._signalChanged()
+
+    def get_save_filename(self):
+        return self.file_select.save_filename
 
     def get_settings(self):
         if self.dropdown.currentIndex() == 1:
@@ -206,6 +212,9 @@ class InputSettings(QtGui.QWidget):
             self.input_shift_label.show()
             if self.file_select.text():
                 self.emit(QtCore.SIGNAL('valueChanged()'))
+
+    def _signalSaveClicked(self):
+        self.emit(QtCore.SIGNAL('saveFileSelected()'))
             
 
 #--------------------------------------------------
@@ -781,6 +790,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
                      self._updateFilter)
         self.connect(self.input_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updateInput)
+        self.connect(self.input_settings, QtCore.SIGNAL('saveFileSelected()'), \
+                     self._saveData)
         self.connect(self.filter_settings, QtCore.SIGNAL('valueChanged()'), \
                      self._updatePlot)
         self.connect(self.plot_options, QtCore.SIGNAL('editingFinished()'), \
@@ -850,6 +861,36 @@ class IIRSimCentralWidget(QtGui.QWidget):
         except ValueError as (msg, ):
             self.status_bar.showMessage('Error: %s' % msg)
         
+    def _saveData(self):
+        data = self.input_data
+        filt = self.filter_settings.get_filter()
+        bits = filt.bits()
+        length = self.plot_options.get_options()['num_samples']
+        input_norm = self.input_norm
+
+        if data is None:
+            x = numpy.array(filt.unit_pulse(length, norm=True))
+        else:
+            x = data
+            while len(x) < length:
+                x.append(0.0)
+            x = numpy.array(x)
+            if not input_norm:
+                B = 1 << bits-1
+                x /= B
+
+        [y_id, y] = [numpy.array( \
+                     filt.response(x, length, True, ideal)) \
+                     for ideal in [True, False]]
+
+        filename = self.input_settings.get_save_filename()
+        f = open(filename, 'w')
+        f.write('# input ; output ; output (ideal)\n')
+        for i in range(length):
+            f.write(' '.join([('%.*f' % (b, v)).rjust(b+3) \
+                for (b, v) in zip([32, bits-1, 32], [x[i], y[i], y_id[i]])]) \
+                + '\n')
+        f.close()
 
 
 #--------------------------------------------------
