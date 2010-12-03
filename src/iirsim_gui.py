@@ -674,7 +674,7 @@ class FilterResponsePlot(QtGui.QWidget):
         if logy_pulse:
             minval = 1.0 / 2**(filt.bits()-1)
             self.impulse_plot.setAxisScale(yaxis, 20*numpy.log10(minval), 0)
-            self.impulse_plot.setAxisTitle(yaxis, 'Signal amplitude / dBFS')
+            self.impulse_plot.setAxisTitle(yaxis, 'Amplitude / dBFS')
             for (i, data) in enumerate(impulse_plot_data):
                 d = data[1]
                 for j in range(len(d)):
@@ -683,17 +683,24 @@ class FilterResponsePlot(QtGui.QWidget):
                 impulse_plot_data[i][1] = 20*numpy.log10(d)
         else:
             self.impulse_plot.setAxisScale(yaxis, -1, 1)
-            self.impulse_plot.setAxisTitle(yaxis, 'Signal amplitude')
+            self.impulse_plot.setAxisTitle(yaxis, 'Amplitude')
 
         if logy_spectrum:
             self.frequency_plot.setAxisScale(yaxis, -30, 30)
-            self.frequency_plot.setAxisTitle(yaxis, 'Magnitude / dB')
+            if spectrum_norm:
+                self.frequency_plot.setAxisTitle(yaxis, 'Gain / dB')
+            else:
+                self.frequency_plot.setAxisTitle(yaxis, 'Spectral density / dB')
             for (i, data) in enumerate(frequency_plot_data):
                 d = data[1]
                 frequency_plot_data[i][1] = 20*numpy.log10(d)
         else:
             self.frequency_plot.setAxisScale(yaxis, 0, 30)
-            self.frequency_plot.setAxisTitle(yaxis, 'Magnitude') # TODO title
+            if spectrum_norm:
+                self.frequency_plot.setAxisTitle(yaxis, 'Gain')
+            else:
+                self.frequency_plot.setAxisTitle(yaxis, \
+                    'Spectral density / A.U.')
 
         colors = [QtCore.Qt.black, QtCore.Qt.gray, QtCore.Qt.blue]
         self.impulse_plot.plot(impulse_plot_data, colors)
