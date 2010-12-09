@@ -146,6 +146,10 @@ class Const(_FilterComponent):
         except (TypeError, ValueError):
             raise
 
+    def reset(self):
+        """Set the stored value to 0."""
+        self.set_value(0)
+
     def set_value(self, value, ideal=False):
         """Set the stored value."""
         self._value = value
@@ -349,6 +353,7 @@ class Filter():
 
     def reset(self):
         """Reset internal filter state."""
+        self._in_node.reset()
         for node in self._delay_nodes:
             node.reset()
 

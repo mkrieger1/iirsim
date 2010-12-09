@@ -135,8 +135,11 @@ class InputSettings(QtGui.QWidget):
     def __init__(self):
         QtGui.QWidget.__init__(self)
 
-        self.dropdown = QtGui.QComboBox()
-        self.dropdown.addItems(['Unit pulse', 'Custom pulse'])
+        self.last_filename = None
+        self.data_from_file = None
+
+        self.input_type_combo = QtGui.QComboBox()
+        self.input_type_combo.addItems(['Unit pulse', 'Custom pulse'])
 
         self.file_select = FileSelect('input data file', \
             'Load pulse from file', 'Save filtered pulse to file', \
@@ -145,13 +148,13 @@ class InputSettings(QtGui.QWidget):
         self.input_norm = QtGui.QCheckBox('Input is normalized')
         self.input_norm.setChecked(True)
 
-        self.input_shift = QtGui.QSpinBox()
-        self.input_shift.setRange(-32, 32)
-        self.input_shift.setValue(0)
-        self.input_shift.setAlignment(QtCore.Qt.AlignRight)
-        self.input_shift_label = QtGui.QLabel('Bit shift')
+        self.norm_bits = QtGui.QSpinBox()
+        self.norm_bits.setRange(0, 32)
+        self.norm_bits.setValue(9)
+        self.norm_bits.setAlignment(QtCore.Qt.AlignRight)
+        self.norm_bits_label = QtGui.QLabel('Input bit width')
 
-        self.connect(self.dropdown, QtCore.SIGNAL('currentIndexChanged(int)'), \
+        self.connect(self.input_type_combo, QtCore.SIGNAL('currentIndexChanged(int)'), \
                      self._signalChanged)
         self.connect(self.file_select, QtCore.SIGNAL('editingFinished()'), \
                      self._signalChanged)
@@ -159,22 +162,22 @@ class InputSettings(QtGui.QWidget):
                      self._signalSaveClicked)
         self.connect(self.input_norm, QtCore.SIGNAL('stateChanged(int)'), \
                      self._signalChanged)
-        self.connect(self.input_shift, QtCore.SIGNAL('valueChanged(int)'), \
+        self.connect(self.norm_bits, QtCore.SIGNAL('valueChanged(int)'), \
                      self._signalChanged)
 
         # layout
         self.file_select.layout().itemAt(1).layout().insertWidget( \
             0, self.input_norm)
         
-        shift_hbox = QtGui.QHBoxLayout()
-        shift_hbox.addWidget(self.input_shift_label)
-        shift_hbox.addWidget(self.input_shift)
-        shift_hbox.addStretch()
+        norm_bits_hbox = QtGui.QHBoxLayout()
+        norm_bits_hbox.addWidget(self.norm_bits_label)
+        norm_bits_hbox.addWidget(self.norm_bits)
+        norm_bits_hbox.addStretch()
 
         vbox = QtGui.QVBoxLayout()
-        vbox.addWidget(self.dropdown)
+        vbox.addWidget(self.input_type_combo)
         vbox.addWidget(self.file_select)
-        vbox.addLayout(shift_hbox)
+        vbox.addLayout(norm_bits_hbox)
         self.setLayout(vbox)
 
         self._signalChanged()
@@ -183,35 +186,59 @@ class InputSettings(QtGui.QWidget):
         return self.file_select.save_filename
 
     def get_settings(self):
-        if self.dropdown.currentIndex() == 1:
+        if self.input_type_combo.currentIndex() == 1:
             pulse_type = 'custom'
         else:
             pulse_type = 'unit'
         pulse_file = os.path.abspath(os.path.expanduser( \
             str(self.file_select.text())) )
         norm = self.input_norm.isChecked()
-        shift = self.input_shift.value()
+        norm_bits = self.norm_bits.value()
         return dict([ \
             ['pulse_type', pulse_type], \
             ['pulse_file', pulse_file], \
             ['input_norm', norm], \
-            ['input_shift', shift] ])
+            ['norm_bits', norm_bits] ])
+
+    def get_data(self):
+        settings = self.get_settings()
+        filename = settings['pulse_file']
+        if not (filename == self.last_filename):
+            try:
+                self.data_from_file = iirsim_cfg.read_data(filename)
+                self.last_filename = filename
+                self.input_norm.setEnabled(True)
+                self.norm_bits.setEnabled(not self.input_norm.isChecked())
+                self.norm_bits_label.setEnabled(not self.input_norm.isChecked())
+            except IOError:
+                self.input_norm.setEnabled(False)
+                self.norm_bits.setEnabled(False)
+                self.norm_bits_label.setEnabled(False)
+                raise
+
+        index = 0 # settings['pulse_index'] TODO
+        input_norm = settings['input_norm']
+        norm_bits = settings['norm_bits']
+        data = self.data_from_file[:, index]
+        if not input_norm: # input IS NOT normalized -> normalize it
+            data = data / (2**(norm_bits-1))
+        return data
 
     def _signalChanged(self):
         pulse_type = self.get_settings()['pulse_type']
         if pulse_type == 'unit':
             self.file_select.hide()
             self.input_norm.hide()
-            self.input_shift.hide()
-            self.input_shift_label.hide()
+            self.norm_bits.hide()
+            self.norm_bits_label.hide()
             self.emit(QtCore.SIGNAL('valueChanged()'))
         else:
-            self.input_shift.setEnabled(not self.input_norm.isChecked())
-            self.input_shift_label.setEnabled(not self.input_norm.isChecked())
+            self.norm_bits.setEnabled(not self.input_norm.isChecked())
+            self.norm_bits_label.setEnabled(not self.input_norm.isChecked())
             self.file_select.show()
             self.input_norm.show()
-            self.input_shift.show()
-            self.input_shift_label.show()
+            self.norm_bits.show()
+            self.norm_bits_label.show()
             if self.file_select.text():
                 self.emit(QtCore.SIGNAL('valueChanged()'))
 
@@ -623,8 +650,8 @@ class FilterResponsePlot(QtGui.QWidget):
         length        = options['num_samples']
         fs            = options['sample_rate']
         time          = options['time_checked']
-        spectrum_norm = options['spectrum_norm']
         input_norm    = options['input_norm']
+        spectrum_norm = options['spectrum_norm']
         logx_pulse    = options['logx_pulse']
         logy_pulse    = options['logy_pulse']
         logx_spectrum = options['logx_spectrum']
@@ -657,12 +684,10 @@ class FilterResponsePlot(QtGui.QWidget):
             x = numpy.array(filt.unit_pulse(length, norm=True))
         else:
             x = data
+            if len(x) > length:
+                x = x[:length]
             while len(x) < length:
-                x.append(0.0)
-            x = numpy.array(x)
-            if not input_norm:
-                B = 1 << filt.bits()-1
-                x /= B
+                x = numpy.append(x, 0.0)
 
         [y_id, y] = [numpy.array( \
                      filt.response(x, length, True, ideal)) \
@@ -751,8 +776,6 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.input_settings = InputSettings()
         self.input_settings_groupbox = QtGui.QGroupBox('Input data')
         self.input_settings_groupbox.setLayout(self.input_settings.layout())
-        self.input_data = None
-        self.input_norm = self.input_settings.get_settings()['input_norm']
 
         # Factor Slider Array
         self.filter_settings = FilterSettings(filter_filename)
@@ -766,6 +789,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 
         # Plot Area
         self.plot_area = FilterResponsePlot()
+        self.plot_data = None
 
         # Layout
         controlVBox = QtGui.QVBoxLayout()
@@ -822,23 +846,15 @@ class IIRSimCentralWidget(QtGui.QWidget):
             self._updateInput()
 
     def _updateInput(self):
-        input_settings = self.input_settings.get_settings()
-        pulse_type = input_settings['pulse_type']
-        pulse_file = input_settings['pulse_file']
-        input_norm = input_settings['input_norm']
-        input_shift = input_settings['input_shift']
+        settings = self.input_settings.get_settings()
+        pulse_type = settings['pulse_type']
 
         data = None
         input_valid = True
 
         if pulse_type == 'custom':
             try:
-                data = iirsim_cfg.read_data(pulse_file)
-                if not input_norm:
-                    for (i, v) in enumerate(data):
-                        data[i] = v * (2**input_shift)
-                        # do not use << because floating point values are
-                        # possible for ideal filter mode
+                data = self.input_settings.get_data()
             except IOError as (msg, ):
                 input_valid = False
                 self.filter_settings_groupbox.setEnabled(False)
@@ -846,18 +862,17 @@ class IIRSimCentralWidget(QtGui.QWidget):
                 self.status_bar.showMessage('Error: %s' % msg)
 
         if input_valid:
-            self.input_data = data
-            self.input_norm = input_norm
+            self.plot_data = data
             self.filter_settings_groupbox.setEnabled(True)
             self.plot_options_groupbox.setEnabled(True)
             self.status_bar.clearMessage()
             self._updatePlot()
 
     def _updatePlot(self):
-        data = self.input_data
+        data = self.plot_data
         filt = self.filter_settings.get_filter()
         options = self.plot_options.get_options()
-        options['input_norm'] = self.input_norm
+        options['input_norm'] = self.input_settings.get_settings()['input_norm']
         try:
             self.status_bar.clearMessage()
             self.plot_area.replot(data, filt, options)
@@ -865,37 +880,38 @@ class IIRSimCentralWidget(QtGui.QWidget):
             self.status_bar.showMessage('Error: %s' % msg)
         
     def _saveData(self):
-        data = self.input_data
-        filt = self.filter_settings.get_filter()
-        bits = filt.bits()
-        length = self.plot_options.get_options()['num_samples']
-        input_norm = self.input_norm
+        raise NotImplementedError
+        #data = self.input_data
+        #filt = self.filter_settings.get_filter()
+        #bits = filt.bits()
+        #length = self.plot_options.get_options()['num_samples']
+        #input_norm = self.input_norm
 
-        if data is None:
-            x = numpy.array(filt.unit_pulse(length, norm=True))
-        else:
-            x = data
-            if len(x) > length:
-                x = x[:length]
-            while len(x) < length:
-                x.append(0.0)
-            x = numpy.array(x)
-            if not input_norm:
-                B = 1 << bits-1
-                x /= B
+        #if data is None:
+        #    x = numpy.array(filt.unit_pulse(length, norm=True))
+        #else:
+        #    x = data
+        #    if len(x) > length:
+        #        x = x[:length]
+        #    while len(x) < length:
+        #        x.append(0.0)
+        #    x = numpy.array(x)
+        #    if not input_norm:
+        #        B = 1 << bits-1
+        #        x /= B
 
-        [y_id, y] = [numpy.array( \
-                     filt.response(x, length, True, ideal)) \
-                     for ideal in [True, False]]
+        #[y_id, y] = [numpy.array( \
+        #             filt.response(x, length, True, ideal)) \
+        #             for ideal in [True, False]]
 
-        filename = self.input_settings.get_save_filename()
-        f = open(filename, 'w')
-        f.write('# input ; output ; output (ideal)\n')
-        for i in range(length):
-            f.write(' '.join([('%.*f' % (b, v)).rjust(b+3) \
-                for (b, v) in zip([32, bits-1, 32], [x[i], y[i], y_id[i]])]) \
-                + '\n')
-        f.close()
+        #filename = self.input_settings.get_save_filename()
+        #f = open(filename, 'w')
+        #f.write('# input ; output ; output (ideal)\n')
+        #for i in range(length):
+        #    f.write(' '.join([('%.*f' % (b, v)).rjust(b+3) \
+        #        for (b, v) in zip([32, bits-1, 32], [x[i], y[i], y_id[i]])]) \
+        #        + '\n')
+        #f.close()
 
 
 #--------------------------------------------------

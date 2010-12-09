@@ -1,4 +1,4 @@
-import shlex, os
+import shlex, os, numpy
 import iirsim_lib
 
 def read_config(filename):
@@ -145,15 +145,12 @@ def read_data(filename):
     if not os.path.isfile(filename):
         raise IOError('File "%s" does not exist' % filename)
     try:
-        f = open(filename)
+        x = numpy.loadtxt(filename)
+        if len(x.shape) == 1:
+            x = x.reshape(len(x), 1) # make n-by-1 matrix out of vector
     except IOError:
-        raise IOError('Could not open file "%s"' % filename)
-    try:
-        x = map(float, f.read().splitlines())
-    except ValueError:
         raise IOError('Could not read data from file "%s"' % filename)
-    f.close()
-    if not x:
+    if not len(x):
         raise IOError('File "%s" contains no data' % filename)
     return x
     
