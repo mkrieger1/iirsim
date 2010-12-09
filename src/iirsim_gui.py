@@ -145,6 +145,13 @@ class InputSettings(QtGui.QWidget):
             'Load pulse from file', 'Save filtered pulse to file', \
             'Pulse files (*.pul)')
 
+        self.pulse_index = QtGui.QSpinBox()
+        self.pulse_index.setRange(1, 1)
+        self.pulse_index.setValue(1)
+        self.pulse_index.setAlignment(QtCore.Qt.AlignRight)
+        self.pulse_index_label = QtGui.QLabel('Pulse')
+        self.pulse_total_label = QtGui.QLabel('of 1')
+
         self.input_norm = QtGui.QCheckBox('Input is normalized')
         self.input_norm.setChecked(True)
 
@@ -164,21 +171,31 @@ class InputSettings(QtGui.QWidget):
                      self._signalChanged)
         self.connect(self.norm_bits, QtCore.SIGNAL('valueChanged(int)'), \
                      self._signalChanged)
+        self.connect(self.pulse_index, QtCore.SIGNAL('valueChanged(int)'), \
+                     self._signalChanged)
 
         # layout
-        self.file_select.layout().itemAt(1).layout().insertWidget( \
-            0, self.input_norm)
-        
         norm_bits_hbox = QtGui.QHBoxLayout()
+        norm_bits_hbox.addWidget(self.input_norm)
+        norm_bits_hbox.addStretch()
         norm_bits_hbox.addWidget(self.norm_bits_label)
         norm_bits_hbox.addWidget(self.norm_bits)
-        norm_bits_hbox.addStretch()
+
+        pulse_index_hbox = QtGui.QHBoxLayout()
+        pulse_index_hbox.addWidget(self.pulse_index_label)
+        pulse_index_hbox.addWidget(self.pulse_index)
+        pulse_index_hbox.addWidget(self.pulse_total_label)
+        pulse_index_hbox.addStretch()
 
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.input_type_combo)
         vbox.addWidget(self.file_select)
         vbox.addLayout(norm_bits_hbox)
+        #vbox.addLayout(pulse_index_hbox)
         self.setLayout(vbox)
+
+        self.file_select.layout().itemAt(1).layout().insertLayout( \
+            0, pulse_index_hbox)
 
         self._signalChanged()
 
@@ -194,29 +211,46 @@ class InputSettings(QtGui.QWidget):
             str(self.file_select.text())) )
         norm = self.input_norm.isChecked()
         norm_bits = self.norm_bits.value()
+        pulse_index = self.pulse_index.value()-1
         return dict([ \
             ['pulse_type', pulse_type], \
             ['pulse_file', pulse_file], \
             ['input_norm', norm], \
-            ['norm_bits', norm_bits] ])
+            ['norm_bits', norm_bits],
+            ['pulse_index', pulse_index] ])
 
     def get_data(self):
-        settings = self.get_settings()
-        filename = settings['pulse_file']
+        filename = self.get_settings()['pulse_file']
         if not (filename == self.last_filename):
             try:
                 self.data_from_file = iirsim_cfg.read_data(filename)
                 self.last_filename = filename
-                self.input_norm.setEnabled(True)
-                self.norm_bits.setEnabled(not self.input_norm.isChecked())
-                self.norm_bits_label.setEnabled(not self.input_norm.isChecked())
+                num_pulses = self.data_from_file.shape[1]
+                success = True
             except IOError:
-                self.input_norm.setEnabled(False)
-                self.norm_bits.setEnabled(False)
-                self.norm_bits_label.setEnabled(False)
+                num_pulses = 1
+                success = False
                 raise
+            finally:
+                self.pulse_index.setMaximum(num_pulses)
+                self.pulse_total_label.setText('of %i' % num_pulses)
+                #if num_pulses > 1: TODO works not always
+                #    self.pulse_index.show()
+                #    self.pulse_index_label.show()
+                #    self.pulse_total_label.show()
+                #else:
+                #    self.pulse_index.hide()
+                #    self.pulse_index_label.hide()
+                #    self.pulse_total_label.hide()
+                self.input_norm.setEnabled(success)
+                self.norm_bits.setEnabled(success and not self.input_norm.isChecked())
+                self.norm_bits_label.setEnabled(success and not self.input_norm.isChecked())
+                self.pulse_index.setEnabled(success)
+                self.pulse_index_label.setEnabled(success)
+                self.pulse_total_label.setEnabled(success)
 
-        index = 0 # settings['pulse_index'] TODO
+        settings = self.get_settings()
+        index = settings['pulse_index']
         input_norm = settings['input_norm']
         norm_bits = settings['norm_bits']
         data = self.data_from_file[:, index]
@@ -231,6 +265,9 @@ class InputSettings(QtGui.QWidget):
             self.input_norm.hide()
             self.norm_bits.hide()
             self.norm_bits_label.hide()
+            self.pulse_index.hide()
+            self.pulse_index_label.hide()
+            self.pulse_total_label.hide()
             self.emit(QtCore.SIGNAL('valueChanged()'))
         else:
             self.norm_bits.setEnabled(not self.input_norm.isChecked())
@@ -239,6 +276,9 @@ class InputSettings(QtGui.QWidget):
             self.input_norm.show()
             self.norm_bits.show()
             self.norm_bits_label.show()
+            self.pulse_index.show()
+            self.pulse_index_label.show()
+            self.pulse_total_label.show()
             if self.file_select.text():
                 self.emit(QtCore.SIGNAL('valueChanged()'))
 
