@@ -69,12 +69,13 @@ class LineEditDnD(QtGui.QLineEdit):
         self.setText(os.path.realpath(filename))
 
 class FileSelect(QtGui.QWidget):
-    def __init__(self, what, loadtext, savetext):
+    def __init__(self, what, loadtext, savetext, file_filter):
         QtGui.QWidget.__init__(self)
         self.filename_edit = LineEditDnD()
         self.filename_edit.setToolTip('Enter path to %s' % what)
         self.loadtext = loadtext
         self.savetext = savetext
+        self.file_filter = file_filter
 
         self.loadbutton = QtGui.QPushButton('Load...')
         self.savebutton = QtGui.QPushButton('Save...')
@@ -106,7 +107,7 @@ class FileSelect(QtGui.QWidget):
     def _select_load_file(self):
         filename = QtGui.QFileDialog.getOpenFileName(self, \
             caption = self.loadtext, \
-            #filter = 'Text files (*.txt);;All Files (*.*)', \
+            filter = self.file_filter+';;All Files (*.*)', \
             directory = self.last_path)
         if filename: # False if dialog is cancelled
             self.last_path = os.path.dirname(str(filename))
@@ -116,7 +117,7 @@ class FileSelect(QtGui.QWidget):
     def _select_save_file(self):
         filename = QtGui.QFileDialog.getSaveFileName(self, \
             caption = self.savetext, \
-            #filter = 'Text files (*.txt);;All Files (*.*)', \
+            filter = self.file_filter+';;All Files (*.*)', \
             directory = self.last_path)
         if filename: # False if dialog is cancelled
             self.last_path = os.path.dirname(str(filename))
@@ -138,7 +139,8 @@ class InputSettings(QtGui.QWidget):
         self.dropdown.addItems(['Unit pulse', 'Custom pulse'])
 
         self.file_select = FileSelect('input data file', \
-            'Load pulse from file', 'Save filtered pulse to file')
+            'Load pulse from file', 'Save filtered pulse to file', \
+            'Pulse files (*.pul)')
 
         self.input_norm = QtGui.QCheckBox('Input is normalized')
         self.input_norm.setChecked(True)
@@ -360,7 +362,8 @@ class FilterSettings(QtGui.QWidget):
         self.last_filename = os.path.abspath(os.path.expanduser(filename))
 
         self.filter_select = FileSelect('filter definition file', \
-            'Load filter from file', 'Save filter to file')
+            'Load filter from file', 'Save filter to file', \
+            'Filter files (*.fil)')
         self.filter_select.filename_edit.setText(filename)
         self.bits_edit = QtGui.QSpinBox()
         self.bits_edit.setAlignment(QtCore.Qt.AlignRight)
@@ -737,7 +740,7 @@ class FilterResponsePlot(QtGui.QWidget):
 #--------------------------------------------------
 
 class IIRSimCentralWidget(QtGui.QWidget):
-    def __init__(self, status_bar=None):
+    def __init__(self, status_bar=None, filter_filename=''):
         QtGui.QWidget.__init__(self)
 
         # status bar, if provided
@@ -752,7 +755,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
         self.input_norm = self.input_settings.get_settings()['input_norm']
 
         # Factor Slider Array
-        self.filter_settings = FilterSettings('../filters/directForm2.txt')
+        self.filter_settings = FilterSettings(filter_filename)
         self.filter_settings_groupbox = QtGui.QGroupBox('Filter settings')
         self.filter_settings_groupbox.setLayout(self.filter_settings.layout())
 
@@ -872,6 +875,8 @@ class IIRSimCentralWidget(QtGui.QWidget):
             x = numpy.array(filt.unit_pulse(length, norm=True))
         else:
             x = data
+            if len(x) > length:
+                x = x[:length]
             while len(x) < length:
                 x.append(0.0)
             x = numpy.array(x)
@@ -898,7 +903,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
 #--------------------------------------------------
 
 class IIRSimMainWindow(QtGui.QMainWindow):
-    def __init__(self):
+    def __init__(self, args):
         QtGui.QMainWindow.__init__(self)
         mainTitle = 'IIRSim'
         self.setWindowTitle(mainTitle)
@@ -908,5 +913,7 @@ class IIRSimMainWindow(QtGui.QMainWindow):
         statusBar.addWidget(QtGui.QLabel('Ready'))
         self.setStatusBar(statusBar)
 
-        self.setCentralWidget(IIRSimCentralWidget(statusBar))
+        filter_filename = args[1]
+
+        self.setCentralWidget(IIRSimCentralWidget(statusBar, filter_filename))
 
