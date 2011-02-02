@@ -1,0 +1,38 @@
+# 2x 1st order direct form II
+#
+#        c                                             
+# x[n] ----->(+)------+----->(+)--(+)------+----->(+)----> y[n]
+#             A       |       A    A       |       A
+#             |       V       |    |       V       |
+#             |     [z-1]     |    |     [z-1]     |
+#             |       |       |    |       |       |
+#             |   a0  |  b0   |    |   a1  |  b1   |
+#             +-------+-------+    +-------+-------+
+#            
+# h[n] = x[n] + b0 x[n-1] + a0 h[n-1]
+# y[n] = h[n] + b1 h[n-1] + a1 y[n-2]
+#
+#                    -1           -1
+#            1 + b0 z     1 + b1 z
+# H(z) = c * ---------- * ---------- 
+#                    -1           -1
+#            1 - a0 z     1 - a1 z
+
+
+bits_global        12
+factor_bits_global 10
+norm_bits_global    9
+
+node Const,    name "const",                         input
+node Add,      name "add1",   connect "c" "a0"
+node Add,      name "add2",   connect "add1" "b0"
+node Add,      name "add3",   connect "add2" "a1"
+node Add,      name "add4",   connect "add3" "b1",   output
+node Delay,    name "delay1", connect "add1"
+node Delay,    name "delay2", connect "add3"
+node Multiply, name "c",      connect "const",       factor 0.998
+node Multiply, name "b0",     connect "delay1"
+node Multiply, name "b1",     connect "delay2"
+node Multiply, name "a0",     connect "delay1"
+node Multiply, name "a1",     connect "delay2"
+
