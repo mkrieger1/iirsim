@@ -398,7 +398,8 @@ class FactorSliderGrid(QtGui.QWidget):
                           for (name, factor) in factor_dict.iteritems()]))
 
         gridLayout = QtGui.QGridLayout()
-        for (row, factorSlider) in enumerate(self.factorSliders.itervalues()):
+        for (row, name) in enumerate(sorted(self.factorSliders.iterkeys())):
+            factorSlider = self.factorSliders[name]
             gridLayout.addWidget(factorSlider.nameLabel,  row, 0)
             gridLayout.addWidget(factorSlider.slider,     row, 1)
             gridLayout.addWidget(factorSlider.valueLabel, row, 2)
