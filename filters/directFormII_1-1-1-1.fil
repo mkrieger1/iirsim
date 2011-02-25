@@ -1,0 +1,53 @@
+# 4x 1st order direct form II
+#
+#        c                                             
+# x[n] ----->(+)------+----->(+)--(+)------+----->(+)---> ...
+#             A       |       A    A       |       A
+#             |       V       |    |       V       |
+#             |     [z-1]     |    |     [z-1]     |
+#             |       |       |    |       |       |
+#             |   a0  |  b0   |    |   a1  |  b1   |
+#             +-------+-------+    +-------+-------+
+#                                                      
+#    ... --->(+)------+----->(+)--(+)------+----->(+)----> y[n]
+#             A       |       A    A       |       A
+#             |       V       |    |       V       |
+#             |     [z-1]     |    |     [z-1]     |
+#             |       |       |    |       |       |
+#             |   a2  |  b2   |    |   a3  |  b3   |
+#             +-------+-------+    +-------+-------+
+#            
+# H(z) = \prod_{i=0}^3 \frac{ 1 + b_i z^{-1} }{ 1 - a_i z^{-1} }
+
+
+bits_global        12
+factor_bits_global 11
+norm_bits_global    9
+
+node Const,    name "const",                         input
+node Multiply, name "c",      connect "const",       factor 1
+
+node Add,      name "add_a0", connect "c" "a0"
+node Add,      name "add_b0", connect "add_a0" "b0"
+node Delay,    name "reg0",   connect "add_a0"
+node Multiply, name "a0",     connect "reg0"
+node Multiply, name "b0",     connect "reg0"
+
+node Add,      name "add_a1", connect "add_b0" "a1"
+node Add,      name "add_b1", connect "add_a1" "b1"
+node Delay,    name "reg1",   connect "add_a1"
+node Multiply, name "a1",     connect "reg1"
+node Multiply, name "b1",     connect "reg1"
+
+node Add,      name "add_a2", connect "add_b1" "a2"
+node Add,      name "add_b2", connect "add_a2" "b2"
+node Delay,    name "reg2",   connect "add_a2"
+node Multiply, name "a2",     connect "reg2"
+node Multiply, name "b2",     connect "reg2"
+
+node Add,      name "add_a3", connect "add_b2" "a3"
+node Add,      name "add_b3", connect "add_a3" "b3", output
+node Delay,    name "reg3",   connect "add_a3"
+node Multiply, name "a3",     connect "reg3"
+node Multiply, name "b3",     connect "reg3"
+
