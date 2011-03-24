@@ -19,6 +19,8 @@ get_output() -- Return the output value by either calling get_output() of the
                 stored value (Const, Delay).
 """
 
+import math
+
 # internally used functions
 #--------------------------------------------------------------------
 def _test_int(x):
@@ -241,16 +243,17 @@ class Multiply(_FilterComponent):
             self._factor = factor
 
     def get_output(self, ideal=False, verbose=False):
-        """Return multiple of the input value using saturation arithmetic."""
+        """Return multiple of the input value."""
         try:
             [input_value] = self._get_input_values(ideal)
         except (RuntimeError, ValueError):
             raise
+        idealvalue = input_value*self._factor / 2.0**self._norm_bits
         if not ideal:
-            P = (input_value*self._factor) >> self._norm_bits
-            value = _saturate(P, self._bits)
+            P = int(round(idealvalue))
+            value = _wrap(P, self._bits)
         else:
-            value = float(input_value*self._factor) / 2**self._norm_bits
+            value = idealvalue
         if verbose:
             if P != value:
                 msg = 'OVERFLOW: %i saturated to %i' % (P, value)
