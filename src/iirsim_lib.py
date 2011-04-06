@@ -250,13 +250,16 @@ class Multiply(_FilterComponent):
             raise
         idealvalue = input_value*self._factor / 2.0**self._norm_bits
         if not ideal:
-            P = int(round(idealvalue))
+            P = int(round(idealvalue)) # -> nearest
+            #P = int(math.floor(idealvalue)) # -> negative
+            #P = int(math.ceil(idealvalue)) # -> positive
+            #P = int(idealvalue) # -> zero
             value = _wrap(P, self._bits)
         else:
             value = idealvalue
         if verbose:
             if P != value:
-                msg = 'OVERFLOW: %i saturated to %i' % (P, value)
+                msg = 'OVERFLOW: %i wrapped to %i' % (P, value)
             else:
                 msg = 'returning %i' % value
             return (value, msg)
