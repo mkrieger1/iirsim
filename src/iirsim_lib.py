@@ -250,8 +250,8 @@ class Multiply(_FilterComponent):
             raise
         idealvalue = input_value*self._factor / 2.0**self._norm_bits
         if not ideal:
-            P = int(round(idealvalue)) # -> nearest
-            #P = int(math.floor(idealvalue)) # -> negative
+            #P = int(round(idealvalue)) # -> nearest
+            P = int(math.floor(idealvalue)) # -> negative
             #P = int(math.ceil(idealvalue)) # -> positive
             #P = int(idealvalue) # -> zero
             value = _wrap(P, self._bits)
