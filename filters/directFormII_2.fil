@@ -19,7 +19,7 @@
 
 
 bits_global        32
-factor_bits_global  9
+factor_bits_global 10
 norm_bits_global   7
 
 node Const,    name "const",                         input
