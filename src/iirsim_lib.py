@@ -156,21 +156,13 @@ class Const(_FilterComponent):
         """Set the stored value."""
         self._value = value
     
-    def get_output(self, ideal=False, verbose=False):
-        """Return the stored value using saturation."""
-        V = self._value
+    def get_output(self, ideal=False):
+        """Return the stored value."""
+        value = self._value
         if not ideal:
-            value = _saturate(int(V), self._bits)
-        else:
-            value = V
-        if verbose:
-            if V != value:
-                msg = 'OVERFLOW: %i saturated to %i' % (V, value)
-            else:
-                msg = 'returning %i' % value
-            return (value, msg)
-        else:
-            return value
+            if _test_overflow(value, self._bits):
+                raise ValueError("input overflow")
+        return value
 
 class Add(_FilterComponent):
     """Adds two integer values using binary two's complement arithmetic."""
