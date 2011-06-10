@@ -234,6 +234,19 @@ class Multiply(_FilterComponent):
         else:
             self._factor = factor
 
+    def set_factor_bits(self, factorbits, normbits):
+        """Change the number of bits used for factor and factor norm."""
+        old_factor = self.factor(norm=True)
+        if factorbits < 2:
+            raise ValueError("number of bits must be at least 2")
+        else:
+            self._factor_bits = factorbits
+        if normbits < 0:
+            raise ValueError("number of bits must be at least 0")
+        else:
+            self._norm_bits = normbits
+        self.set_factor(old_factor, norm=True)
+
     def get_output(self, ideal=False, verbose=False):
         """Return multiple of the input value."""
         try:
