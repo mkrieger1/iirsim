@@ -438,6 +438,11 @@ class Filter():
                         [self._nodes[name]._norm_bits \
                          for name in self._mul_node_names]))
 
+    def set_factor_bits(self, factorbits, normbits):
+        """Set factor and normalization bits for all Multiply nodes."""
+        for node in [self._nodes[name] for name in self._mul_node_names]:
+            node.set_factor_bits(factorbits, normbits)
+
     def set_factor(self, name, factor, norm=False):
         """Set the factor of a Multiply node."""
         try:
