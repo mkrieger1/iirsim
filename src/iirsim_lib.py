@@ -76,9 +76,9 @@ def _unit_pulse(bits, length, norm=False):
     for i in range(length-1):
         yield 0
 
-# base class: _FilterComponent
+# base class: _FilterNode
 #--------------------------------------------------------------------
-class _FilterComponent():
+class _FilterNode():
     """Base class for Const, Delay, Add, Multiply"""
 
     # internally used methods
@@ -108,8 +108,8 @@ class _FilterComponent():
             raise TypeError("list of input nodes expected")
         elif not len(input_nodes) == self._ninputs:
             raise ValueError("number of input nodes must be %i" % self._ninputs)
-        elif not all([isinstance(x, _FilterComponent) for x in input_nodes]):
-            raise TypeError("input nodes must be instance of _FilterComponent")
+        elif not all([isinstance(x, _FilterNode) for x in input_nodes]):
+            raise TypeError("input nodes must be instance of _FilterNode")
         elif not all([node.bits() == self._bits for node in input_nodes]):
             raise ValueError("number of bits does not match")
         else:
@@ -132,15 +132,15 @@ class _FilterComponent():
         else:
             self._bits = bits
 
-# Const, Add, Multiply, Delay are inherited from the _FilterComponent base class
+# Const, Add, Multiply, Delay are inherited from the _FilterNode base class
 #--------------------------------------------------------------------
-class Const(_FilterComponent):
+class Const(_FilterNode):
     """Stores a constant integer value that must be set explicitly."""
 
     def __init__(self, bits, value=0):
         """Set the number of bits and the initial value."""
         try:
-            _FilterComponent.__init__(self, 0, bits)
+            _FilterNode.__init__(self, 0, bits)
         except (TypeError, ValueError):
             raise
         try:
@@ -164,13 +164,13 @@ class Const(_FilterComponent):
                 raise ValueError("input overflow")
         return value
 
-class Add(_FilterComponent):
+class Add(_FilterNode):
     """Adds two integer values using binary two's complement arithmetic."""
 
     def __init__(self, bits):
         """Set the number of bits for the inputs."""
         try:
-            _FilterComponent.__init__(self, 2, bits)
+            _FilterNode.__init__(self, 2, bits)
         except (TypeError, ValueError):
             raise
 
@@ -194,12 +194,12 @@ class Add(_FilterComponent):
         else:
             return value
 
-class Multiply(_FilterComponent):
+class Multiply(_FilterNode):
     """Multiplies the input value by a constant factor."""
     def __init__(self, bits, factor_bits, norm_bits, factor=0):
         """Set the number of bits for the input, the factor and the norm."""
         try:
-            _FilterComponent.__init__(self, 1, bits)
+            _FilterNode.__init__(self, 1, bits)
         except (TypeError, ValueError):
             raise
 
@@ -278,12 +278,12 @@ class Multiply(_FilterComponent):
         else:
             return self._factor
 
-class Delay(_FilterComponent):
+class Delay(_FilterNode):
     """Stores the input value."""
     def __init__(self, bits):
         """Set the number of bits for the input."""
         try:
-            _FilterComponent.__init__(self, 1, bits)
+            _FilterNode.__init__(self, 1, bits)
         except (TypeError, ValueError):
             raise
         self.reset()
@@ -321,7 +321,7 @@ class Filter():
     def __init__(self, node_dict, adjacency_dict, in_node, out_node):
         """Connect nodes to a graph structure forming a filter.
         
-        node_dict:      Dictionary of (name, _FilterComponent) pairs.
+        node_dict:      Dictionary of (name, _FilterNode) pairs.
 
         adjacency_dict: Defines the connections between the nodes.
 
@@ -333,9 +333,9 @@ class Filter():
         """
         if not isinstance(node_dict, dict):
             raise TypeError('dict of filter nodes expected')
-        elif not all([isinstance(node, _FilterComponent) \
+        elif not all([isinstance(node, _FilterNode) \
                       for node in node_dict.values()]):
-            raise TypeError('filter nodes must be _FilterComponent instances')
+            raise TypeError('filter nodes must be _FilterNode instances')
         if not isinstance(node_dict[in_node], Const):
             raise TypeError("input node must be Const instance")
         self._nodes = node_dict
