@@ -154,14 +154,14 @@ class Const(_FilterNode):
 
     def set_value(self, value, ideal=False):
         """Set the stored value."""
+        if not ideal:
+            if _test_overflow(value, self._bits):
+                raise ValueError("input overflow")
         self._value = value
     
     def get_output(self, ideal=False):
         """Return the stored value."""
         value = self._value
-        if not ideal:
-            if _test_overflow(value, self._bits):
-                raise ValueError("input overflow")
         return value
 
 class Add(_FilterNode):
