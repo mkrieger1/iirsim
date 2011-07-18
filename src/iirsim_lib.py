@@ -342,11 +342,10 @@ class Filter():
         self._adjacency = adjacency_dict
         self._in_node = node_dict[in_node]
         self._out_node = node_dict[out_node]
-        self._delay_nodes = filter(lambda x: isinstance(x, Delay), \
-                                  self._nodes.values())
-        self._mul_node_names = filter(lambda name: \
-            isinstance(self._nodes[name], Multiply), self._nodes.keys())
-               # (builtin function 'filter' has nothing to do with IIR filters)
+        self._delay_nodes = [node for node in self._nodes.values()
+                             if isinstance(node, Delay)]
+        self._mul_node_names = [name for name in self._nodes.keys()
+                                if isinstance(self._nodes[name], Multiply)]
 
         for (name, node) in self._nodes.iteritems():
             input_nodes = [self._nodes[n] for n in self._adjacency[name]]
