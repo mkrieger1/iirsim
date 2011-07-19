@@ -455,7 +455,6 @@ class Filter():
 
     def factors(self, norm=False):
         """Return names of the Multiply nodes with their factors."""
-        return dict(zip(self._mul_node_names, \
-                        [self._nodes[name].factor(norm) \
-                         for name in self._mul_node_names]))
+        return dict((name, self._nodes[name].factor(norm))
+                     for name in self._mul_node_names)
 
