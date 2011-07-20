@@ -1,0 +1,9 @@
+bits_global 10
+factor_bits_global 8
+norm_bits_global 7
+
+node Const, name "Const", input
+node Multiply, name "Mult", connect "Delay", factor 0.6
+node Delay, name "Delay", connect "Add"
+node Add, name "Add", connect "Const" "Mult", output
+
