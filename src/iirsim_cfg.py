@@ -16,7 +16,7 @@ def load_config(filename):
         try:
             # remove all comments and unnecessary whitespace
             normalizer = shlex.shlex(line)
-            normalizer.wordchars += '.'
+            normalizer.wordchars += '.-'
             normal_line = ' '.join([t for t in normalizer])
             if normal_line:
                 # split up normalized line and build dictionary
