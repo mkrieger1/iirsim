@@ -19,40 +19,40 @@
 # H(z) = (1 + b_0 z^{-1}) \prod_{i=1}^3 \frac{ 1 + b_i z^{-1} }{ 1 - a_i z^{-1} }
 
 
-bits_global        12
-factor_bits_global  8
-norm_bits_global    7
+bits_global        16
+factor_bits_global  6
+norm_bits_global    5
 
 node Const,    name "X",                         input
 #node Multiply, name "c",      connect "const",       factor 1
 
 node Add,      name "add_b0", connect "X" "b0"
 node Delay,    name "reg0",   connect "X"
-node Multiply, name "b0",     connect "reg0"
+node Multiply, name "b0",     connect "reg0",         factor -0.9
 
 node Delay,    name "pipe0",  connect "add_b0"
 
 node Add,      name "add_a1", connect "pipe0" "a1"
 node Add,      name "add_b1", connect "add_a1" "b1"
 node Delay,    name "reg1",   connect "add_a1"
-node Multiply, name "a1",     connect "reg1"
-node Multiply, name "b1",     connect "reg1"
+node Multiply, name "a1",     connect "reg1",         factor  0.7
+node Multiply, name "b1",     connect "reg1",         factor -0.6
 
 node Delay,    name "pipe1",  connect "add_b1"
 
 node Add,      name "add_a2", connect "pipe1" "a2"
 node Add,      name "add_b2", connect "add_a2" "b2"
 node Delay,    name "reg2",   connect "add_a2"
-node Multiply, name "a2",     connect "reg2"
-node Multiply, name "b2",     connect "reg2"
+node Multiply, name "a2",     connect "reg2",         factor  0.4
+node Multiply, name "b2",     connect "reg2",         factor -0.3
 
 node Delay,    name "pipe2",  connect "add_b2"
 
 node Add,      name "add_a3", connect "pipe2" "a3"
 node Add,      name "add_b3", connect "add_a3" "b3"
 node Delay,    name "reg3",   connect "add_a3"
-node Multiply, name "a3",     connect "reg3"
-node Multiply, name "b3",     connect "reg3"
+node Multiply, name "a3",     connect "reg3",         factor  0.2
+node Multiply, name "b3",     connect "reg3",         factor -0.1
 
 node Delay,    name "pipe3",  connect "add_b3",      output
 
