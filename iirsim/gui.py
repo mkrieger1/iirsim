@@ -1,7 +1,7 @@
 import os, numpy
 from PyQt4 import QtCore, QtGui, Qwt5
 
-import iirsim_cfg
+from . import cfg
 
 
 #--------------------------------------------------
@@ -223,7 +223,7 @@ class InputSettings(QtGui.QWidget):
         filename = self.get_settings()['pulse_file']
         if not (filename == self.last_filename):
             try:
-                self.data_from_file = iirsim_cfg.read_data(filename)
+                self.data_from_file = cfg.read_data(filename)
                 self.last_filename = filename
                 num_pulses = self.data_from_file.shape[1]
                 success = True
@@ -469,7 +469,7 @@ class FilterSettings(QtGui.QWidget):
 
     def load_filter(self):
         try:
-            self.filt = iirsim_cfg.load_config(self.last_filename)
+            self.filt = cfg.load_config(self.last_filename)
         except (IOError, RuntimeError, ValueError) as (msg, ):
             self.bits_edit.setEnabled(False)
             self.bits_edit_label.setEnabled(False)

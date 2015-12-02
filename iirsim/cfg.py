@@ -1,5 +1,5 @@
 import shlex, os, numpy
-import iirsim_lib
+from .core import Const, Add, Multiply, Delay, Filter
 
 def load_config(filename):
     """Read configuration file and return a filter."""
@@ -100,11 +100,11 @@ def load_config(filename):
         if name not in filter_nodes:
             if bits is not None:
                 if node == 'Const':
-                    filter_nodes[name] = iirsim_lib.Const(bits)
+                    filter_nodes[name] = Const(bits)
                 elif node == 'Add':
-                    filter_nodes[name] = iirsim_lib.Add(bits)
+                    filter_nodes[name] = Add(bits)
                 elif node == 'Delay':
-                    filter_nodes[name] = iirsim_lib.Delay(bits)
+                    filter_nodes[name] = Delay(bits)
                 elif node == 'Multiply':
                     if 'factor_bits' in cfg_item:
                         [factor_bits] = cfg_item['factor_bits']
@@ -117,8 +117,8 @@ def load_config(filename):
                     else:
                         norm_bits = norm_bits_global
                     if (factor_bits is not None and norm_bits is not None):
-                        filter_nodes[name] = iirsim_lib.Multiply( \
-                                             bits, factor_bits, norm_bits)
+                        filter_nodes[name] = Multiply(
+                                               bits, factor_bits, norm_bits)
                     if 'factor' in cfg_item:
                         [factor] = cfg_item['factor']
                         factor = float(factor)
@@ -138,8 +138,7 @@ def load_config(filename):
     elif output_node is None:
         raise RuntimeError('No output node specified')
     else:
-        return iirsim_lib.Filter(filter_nodes, adjacency, \
-                                 input_node, output_node)
+        return Filter(filter_nodes, adjacency, input_node, output_node)
 
 def save_config(filt, filename):
     for name in filt._nodes.iterkeys():
