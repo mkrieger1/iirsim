@@ -1,7 +1,7 @@
 import shlex, os, numpy
 from .core import Const, Add, Multiply, Delay, Filter
 
-def load_config(filename):
+def load_filter(filename):
     """Read configuration file and return a filter."""
     # parse config file
     if not os.path.isfile(filename):
@@ -140,7 +140,7 @@ def load_config(filename):
     else:
         return Filter(filter_nodes, adjacency, input_node, output_node)
 
-def save_config(filt, filename):
+def save_filter(filt, filename):
     for name in filt._nodes.iterkeys():
         print name # TODO
 
@@ -159,5 +159,5 @@ def read_data(filename):
     
 
 if __name__=='__main__':
-    load_config('directForm2.txt')
+    load_filter('directForm2.txt')
 

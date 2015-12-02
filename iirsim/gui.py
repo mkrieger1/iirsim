@@ -469,7 +469,7 @@ class FilterSettings(QtGui.QWidget):
 
     def load_filter(self):
         try:
-            self.filt = cfg.load_config(self.last_filename)
+            self.filt = cfg.load_filter(self.last_filename)
         except (IOError, RuntimeError, ValueError) as (msg, ):
             self.bits_edit.setEnabled(False)
             self.bits_edit_label.setEnabled(False)
