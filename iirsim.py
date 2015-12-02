@@ -8,6 +8,8 @@ from PyQt4 import QtCore, QtGui
 import src.iirsim_gui as iirsim_gui
 
 if __name__=='__main__':
+    # Allow killing the app by pressing Ctrl-C (see also:
+    # http://stackoverflow.com/q/4938723/4621513).
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QtGui.QApplication(sys.argv)
     main = iirsim_gui.IIRSimMainWindow(sys.argv)
