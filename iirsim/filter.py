@@ -5,7 +5,7 @@ class Filter():
     """This class makes a filter out of individual filter nodes."""
     def __init__(self, node_dict, adjacency_dict, in_node, out_node):
         """Connect nodes to a graph structure forming a filter.
-        
+
         node_dict:      Dictionary of (name, _FilterNode) pairs.
 
         adjacency_dict: Defines the connections between the nodes.

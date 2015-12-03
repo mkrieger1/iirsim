@@ -25,7 +25,7 @@ class _FilterNode():
             if any([_test_overflow(value, self._bits) for value in input_values]):
                 raise ValueError("input overflow")
         return input_values
-        
+
     # public methods
     def connect(self, input_nodes):
         """Set the input nodes."""
@@ -83,7 +83,7 @@ class Const(_FilterNode):
             if _test_overflow(value, self._bits):
                 raise ValueError("input overflow")
         self._value = value
-    
+
     def get_output(self, ideal=False):
         """Return the stored value."""
         value = self._value
@@ -150,7 +150,7 @@ class Multiply(_FilterNode):
             factor = int(round((1 << self._norm_bits)*factor))
         if _test_overflow(factor, self._factor_bits):
             min_fact = -1 << self._factor_bits-1
-            max_fact = (1 << self._factor_bits-1)-1 
+            max_fact = (1 << self._factor_bits-1)-1
             min_fact_sc = float(min_fact)/(1 << self._norm_bits)
             max_fact_sc = float(max_fact)/(1 << self._norm_bits)
             raise ValueError( \

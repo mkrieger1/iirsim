@@ -157,7 +157,7 @@ def read_data(filename):
     if not len(x):
         raise IOError('File "%s" contains no data' % filename)
     return x
-    
+
 
 if __name__=='__main__':
     load_filter('directForm2.txt')

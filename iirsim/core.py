@@ -3,10 +3,10 @@
 def _test_int(x):
     """Combined test for int type and long type."""
     return (isinstance(x, int) or isinstance(x, long))
-    
+
 def _wrap(x, N):
     """Reduce integer x to N bits, wrapping in case of overflow.
-   
+
     With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
     For -B <= x < B, x remains unchanged.
     """

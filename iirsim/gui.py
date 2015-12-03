@@ -103,7 +103,7 @@ class FileSelect(QtGui.QWidget):
 
     def text(self):
         return self.filename_edit.text()
- 
+
     def _select_load_file(self):
         filename = QtGui.QFileDialog.getOpenFileName(self, \
             caption = self.loadtext, \
@@ -113,7 +113,7 @@ class FileSelect(QtGui.QWidget):
             self.last_path = os.path.dirname(str(filename))
             self.filename_edit.setText(filename)
             self._signalEditingFinished()
- 
+
     def _select_save_file(self):
         filename = QtGui.QFileDialog.getSaveFileName(self, \
             caption = self.savetext, \
@@ -284,7 +284,7 @@ class InputSettings(QtGui.QWidget):
 
     def _signalSaveClicked(self):
         self.emit(QtCore.SIGNAL('saveFileSelected()'))
-            
+
 
 #--------------------------------------------------
 # Filter settings
@@ -919,7 +919,7 @@ class IIRSimCentralWidget(QtGui.QWidget):
             self.plot_area.replot(data, filt, options)
         except ValueError as (msg, ):
             self.status_bar.showMessage('Error: %s' % msg)
-        
+
     def _saveData(self):
         raise NotImplementedError
         #data = self.input_data
