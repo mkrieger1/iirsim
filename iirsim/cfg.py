@@ -1,5 +1,6 @@
 import shlex, os, numpy
-from .core import Const, Add, Multiply, Delay, Filter
+from .core import Filter
+from .nodes import Const, Add, Multiply, Delay
 
 def load_filter(filename):
     """Read configuration file and return a filter."""
