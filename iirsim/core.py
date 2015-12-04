@@ -50,7 +50,7 @@ def _test_overflow(x, N):
     if not _test_int(x):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
-    return (x < -B) or (x > B-1)
+    return not (-B <= x < B)
 
 def _unit_pulse(bits, length, norm=False):
     """Return unit pulse as generator object."""
