@@ -2,7 +2,7 @@
 #--------------------------------------------------------------------
 def _test_int(x):
     """Combined test for int type and long type."""
-    return (isinstance(x, int) or isinstance(x, long))
+    return isinstance(x, (int, long))
 
 def _wrap(x, N):
     """Reduce integer x to N bits, wrapping in case of overflow.
