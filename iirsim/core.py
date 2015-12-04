@@ -40,7 +40,13 @@ def _saturate(x, N):
     return max(-B, min(B-1, x))
 
 def _test_overflow(x, N):
-    """Test if integer x can be represented as N bit two's complement number."""
+    """
+    Test if integer x cannot be represented as an N bit two's complement
+    number.
+
+    >>> [int(_test_overflow(x, 3)) for x in range(-5, 5)]
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    """
     if not _test_int(x):
         raise TypeError("input value must be 'int'")
     B = 2**(N-1)
