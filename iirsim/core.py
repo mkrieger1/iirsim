@@ -14,10 +14,11 @@ def _test_int(x):
     return isinstance(x, (int, long))
 
 def _wrap(x, N):
-    """Reduce integer x to N bits, wrapping in case of overflow.
+    """
+    Reduce integer x to N bits in 2's complement, wrapping in case of overflow.
 
-    With B = 2^(N-1) the largest absolute value, (x+B) MOD 2^N - B is returned.
-    For -B <= x < B, x remains unchanged.
+    >>> [_wrap(x, 3) for x in range(-5, 5)]
+    [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
     """
     if not _test_int(x):
         raise TypeError("input value must be 'int'")
