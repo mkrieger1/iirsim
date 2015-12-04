@@ -26,12 +26,12 @@ def _wrap(x, N):
     return ((x+B) % 2**N) - B
 
 def _saturate(x, N):
-    """Reduce integer x to N bits, saturating in case of overflow.
+    """
+    Reduce integer x to N bits in 2's complement, saturating in case of
+    overflow.
 
-    With B = 2^(N-1) the largest absolute value,
-    B-1 is returned for x > B-1,
-    -B  is returned for x < -B,
-    for -B <= x < B, x remains unchanged.
+    >>> [_saturate(x, 3) for x in range(-5, 5)]
+    [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
     """
     if not _test_int(x):
         raise TypeError("input value must be 'int'")
