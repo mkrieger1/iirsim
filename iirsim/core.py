@@ -15,7 +15,8 @@ def _test_int(x):
 
 def _wrap(x, N):
     """
-    Reduce integer x to N bits in 2's complement, wrapping in case of overflow.
+    Reduce integer x to N bits in two's complement, wrapping in case of
+    overflow.
 
     >>> [_wrap(x, 3) for x in range(-5, 5)]
     [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
@@ -27,7 +28,7 @@ def _wrap(x, N):
 
 def _saturate(x, N):
     """
-    Reduce integer x to N bits in 2's complement, saturating in case of
+    Reduce integer x to N bits in two's complement, saturating in case of
     overflow.
 
     >>> [_saturate(x, 3) for x in range(-5, 5)]
