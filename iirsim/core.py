@@ -1,7 +1,16 @@
 # internally used functions
 #--------------------------------------------------------------------
 def _test_int(x):
-    """Combined test for int type and long type."""
+    """
+    Test if x is of one of the integer types.
+
+    >>> _test_int(3)
+    True
+    >>> _test_int(3L)
+    True
+    >>> _test_int(3.0)
+    False
+    """
     return isinstance(x, (int, long))
 
 def _wrap(x, N):
