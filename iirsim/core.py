@@ -60,16 +60,3 @@ def _test_overflow(x, N):
     """
     limit = 1 << (N - 1)
     return (x < -limit) | (x >= limit)
-
-def _unit_pulse(bits, length, norm=False):
-    """Return unit pulse as generator object."""
-    if norm:
-        yield float((1 << bits-1) - 1) / (1 << bits-1)
-    else:
-        if bits < 2:
-            raise ValueError('number of bits must be at least 2')
-        if length < 1:
-            raise ValueError('length must be at least 1')
-        yield (1 << bits-1) - 1
-    for i in range(length-1):
-        yield 0

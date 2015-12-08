@@ -1,5 +1,4 @@
 from .nodes import _FilterNode, Const, Multiply, Delay
-from .core import _unit_pulse
 
 class Filter():
     """This class makes a filter out of individual filter nodes."""
@@ -75,6 +74,17 @@ class Filter():
 
     def unit_pulse(self, length, norm=False):
         """Return the first sample of the unit pulse."""
+        def _unit_pulse(bits, length, norm=False):
+            if norm:
+                yield float((1 << bits-1) - 1) / (1 << bits-1)
+            else:
+                if bits < 2:
+                    raise ValueError('number of bits must be at least 2')
+                if length < 1:
+                    raise ValueError('length must be at least 1')
+                yield (1 << bits-1) - 1
+            for i in range(length-1):
+                yield 0
         return [x for x in _unit_pulse(self._in_node._bits, length, norm)]
 
     def response(self, data, length, norm=False, ideal=False):
