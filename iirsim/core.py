@@ -57,8 +57,8 @@ def _test_overflow(x, N):
     >>> map(int, _test_overflow(numpy.arange(-5, 5), 3))
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     """
-    B = 2**(N-1)
-    return not (-B <= x < B)
+    limit = 1 << (N - 1)
+    return (x < -limit) | (x >= limit)
 
 def _unit_pulse(bits, length, norm=False):
     """Return unit pulse as generator object."""
