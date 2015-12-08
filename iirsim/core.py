@@ -15,10 +15,14 @@ def _test_int(x):
 
 def _wrap(x, N):
     """
-    Reduce integer x to N bits in two's complement, wrapping in case of
+    Reduce integer (array) x to N bits in two's complement, wrapping in case of
     overflow.
 
     >>> [_wrap(x, 3) for x in range(-5, 5)]
+    [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
+
+    >>> import numpy
+    >>> list(_wrap(numpy.arange(-5, 5), 3))
     [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
     """
     B = 2**(N-1)
@@ -26,10 +30,14 @@ def _wrap(x, N):
 
 def _saturate(x, N):
     """
-    Reduce integer x to N bits in two's complement, saturating in case of
-    overflow.
+    Reduce integer (array) x to N bits in two's complement, saturating in case
+    of overflow.
 
     >>> [_saturate(x, 3) for x in range(-5, 5)]
+    [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
+
+    >>> import numpy
+    >>> list(_saturate(numpy.arange(-5, 5), 3))
     [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
     """
     B = 2**(N-1)
@@ -37,10 +45,14 @@ def _saturate(x, N):
 
 def _test_overflow(x, N):
     """
-    Test if integer x cannot be represented as an N bit two's complement
+    Test if integer (array) x cannot be represented as an N bit two's complement
     number.
 
     >>> [int(_test_overflow(x, 3)) for x in range(-5, 5)]
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+
+    >>> import numpy
+    >>> map(int, _test_overflow(numpy.arange(-5, 5), 3))
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     """
     B = 2**(N-1)
