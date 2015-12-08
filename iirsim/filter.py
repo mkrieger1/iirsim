@@ -91,10 +91,6 @@ class Filter():
                     yield self.feed(data[i], norm, ideal)
         return [x for x in gen_response()]
 
-    def impulse_response(self, length, norm=False, ideal=False):
-        """Return the impulse response of the filter."""
-        return self.response(self.unit_pulse(1, norm), length, norm, ideal)
-
     def bits(self):
         """Return the number of bits for all nodes."""
         bits_list = [node.bits() for node in self._nodes.itervalues()]
