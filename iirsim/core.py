@@ -21,8 +21,6 @@ def _wrap(x, N):
     >>> [_wrap(x, 3) for x in range(-5, 5)]
     [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
     """
-    if not _test_int(x):
-        raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return ((x+B) % 2**N) - B
 
@@ -34,8 +32,6 @@ def _saturate(x, N):
     >>> [_saturate(x, 3) for x in range(-5, 5)]
     [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
     """
-    if not _test_int(x):
-        raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return max(-B, min(B-1, x))
 
@@ -47,8 +43,6 @@ def _test_overflow(x, N):
     >>> [int(_test_overflow(x, 3)) for x in range(-5, 5)]
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     """
-    if not _test_int(x):
-        raise TypeError("input value must be 'int'")
     B = 2**(N-1)
     return not (-B <= x < B)
 
