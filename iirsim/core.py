@@ -1,3 +1,5 @@
+import numpy
+
 # internally used functions
 #--------------------------------------------------------------------
 def _test_int(x):
@@ -40,8 +42,8 @@ def _saturate(x, N):
     >>> list(_saturate(numpy.arange(-5, 5), 3))
     [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
     """
-    B = 2**(N-1)
-    return max(-B, min(B-1, x))
+    limit = 1 << (N - 1)
+    return numpy.clip(x, -limit, limit - 1)
 
 def _test_overflow(x, N):
     """
