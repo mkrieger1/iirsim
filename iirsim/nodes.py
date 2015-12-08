@@ -8,13 +8,8 @@ class _FilterNode():
 
     # internally used methods
     def __init__(self, ninputs, bits):
-        if not _test_int(ninputs):
-            raise TypeError("number of inputs must be 'int'")
-        elif ninputs < 0:
-            raise ValueError("number of inputs must not be negative")
-        else:
-            self._input_nodes = [None for i in range(ninputs)]
-            self._ninputs = ninputs
+        self._input_nodes = [None for i in range(ninputs)]
+        self._ninputs = ninputs
         self.set_bits(bits)
 
     def _get_input_values(self, ideal=False):
@@ -50,12 +45,7 @@ class _FilterNode():
 
     def set_bits(self, bits):
         """Set the number of bits."""
-        if not _test_int(bits):
-            raise TypeError("number of bits must be 'int'")
-        elif bits < 2:
-            raise ValueError("number of bits must be at least 2")
-        else:
-            self._bits = bits
+        self._bits = bits
 
 # Const, Add, Multiply, Delay are inherited from the _FilterNode base class
 #--------------------------------------------------------------------
@@ -128,19 +118,8 @@ class Multiply(_FilterNode):
         except (TypeError, ValueError):
             raise
 
-        if not _test_int(factor_bits):
-            raise TypeError("factor_bits must be 'int'")
-        elif factor_bits < 2:
-            raise ValueError("factor_bits must be at least 2")
-        else:
-            self._factor_bits = factor_bits
-
-        if not _test_int(norm_bits):
-            raise TypeError("norm_bits must be 'int'")
-        elif norm_bits < 0:
-            raise ValueError("norm_bits must not be negative")
-        else:
-            self._norm_bits = norm_bits
+        self._factor_bits = factor_bits
+        self._norm_bits = norm_bits
 
         self.set_factor(factor)
 
@@ -162,14 +141,8 @@ class Multiply(_FilterNode):
     def set_factor_bits(self, factorbits, normbits):
         """Change the number of bits used for factor and factor norm."""
         old_factor = self.factor(norm=True)
-        if factorbits < 2:
-            raise ValueError("number of bits must be at least 2")
-        else:
-            self._factor_bits = factorbits
-        if normbits < 0:
-            raise ValueError("number of bits must be at least 0")
-        else:
-            self._norm_bits = normbits
+        self._factor_bits = factorbits
+        self._norm_bits = normbits
         self.set_factor(old_factor, norm=True)
 
     def get_output(self, ideal=False, verbose=False):
