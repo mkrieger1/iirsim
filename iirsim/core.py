@@ -27,8 +27,9 @@ def _wrap(x, N):
     >>> list(_wrap(numpy.arange(-5, 5), 3))
     [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
     """
-    B = 2**(N-1)
-    return ((x+B) % 2**N) - B
+    offset = 1 << (N - 1)
+    mask = (1 << N) - 1
+    return ((x + offset) & mask) - offset
 
 def _saturate(x, N):
     """
