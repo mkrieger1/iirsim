@@ -50,14 +50,8 @@ class Const(_FilterNode):
 
     def __init__(self, bits, value=0):
         """Set the number of bits and the initial value."""
-        try:
-            _FilterNode.__init__(self, 0, bits)
-        except (TypeError, ValueError):
-            raise
-        try:
-            self.set_value(value)
-        except (TypeError, ValueError):
-            raise
+        _FilterNode.__init__(self, 0, bits)
+        self.set_value(value)
 
     def reset(self):
         """Set the stored value to 0."""
@@ -80,17 +74,11 @@ class Add(_FilterNode):
 
     def __init__(self, bits):
         """Set the number of bits for the inputs."""
-        try:
-            _FilterNode.__init__(self, 2, bits)
-        except (TypeError, ValueError):
-            raise
+        _FilterNode.__init__(self, 2, bits)
 
     def get_output(self, ideal=False, verbose=False):
         """Return the sum of the input values using modular arithmetic."""
-        try:
-            input_values = self._get_input_values(ideal)
-        except (RuntimeError, ValueError):
-            raise
+        input_values = self._get_input_values(ideal)
         S = sum(input_values)
         if not ideal:
             value = _wrap(S, self._bits)
@@ -109,10 +97,7 @@ class Multiply(_FilterNode):
     """Multiplies the input value by a constant factor."""
     def __init__(self, bits, factor_bits, norm_bits, factor=0):
         """Set the number of bits for the input, the factor and the norm."""
-        try:
-            _FilterNode.__init__(self, 1, bits)
-        except (TypeError, ValueError):
-            raise
+        _FilterNode.__init__(self, 1, bits)
 
         self._factor_bits = factor_bits
         self._norm_bits = norm_bits
@@ -143,10 +128,7 @@ class Multiply(_FilterNode):
 
     def get_output(self, ideal=False, verbose=False):
         """Return multiple of the input value."""
-        try:
-            [input_value] = self._get_input_values(ideal)
-        except (RuntimeError, ValueError):
-            raise
+        [input_value] = self._get_input_values(ideal)
         idealvalue = input_value*self._factor / 2.0**self._norm_bits
         if not ideal:
             #P = int(round(idealvalue)) # -> nearest
@@ -176,10 +158,7 @@ class Delay(_FilterNode):
     """Stores the input value."""
     def __init__(self, bits):
         """Set the number of bits for the input."""
-        try:
-            _FilterNode.__init__(self, 1, bits)
-        except (TypeError, ValueError):
-            raise
+        _FilterNode.__init__(self, 1, bits)
         self.reset()
 
     def reset(self):
@@ -193,11 +172,8 @@ class Delay(_FilterNode):
 
     def sample(self, ideal=False):
         """Set input value as next value."""
-        try:
-            [input_value] = self._get_input_values(ideal)
-            self._next_value = input_value
-        except (RuntimeError, ValueError):
-            raise
+        [input_value] = self._get_input_values(ideal)
+        self._next_value = input_value
 
     def get_output(self, ideal=False, verbose=False):
         """Return current value."""

@@ -26,10 +26,7 @@ class Filter():
 
         for (name, node) in self._nodes.iteritems():
             input_nodes = [self._nodes[n] for n in self._adjacency[name]]
-            try:
-                node.connect(input_nodes)
-            except (TypeError, ValueError):
-                raise
+            node.connect(input_nodes)
 
     def _update(self, ideal=False):
         """Update all Delay nodes."""
