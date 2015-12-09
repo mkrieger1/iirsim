@@ -15,13 +15,6 @@ class Filter():
         out_node:       Key of the node in node_dict that serves as filter
                         output.
         """
-        if not isinstance(node_dict, dict):
-            raise TypeError('dict of filter nodes expected')
-        elif not all([isinstance(node, _FilterNode) \
-                      for node in node_dict.values()]):
-            raise TypeError('filter nodes must be _FilterNode instances')
-        if not isinstance(node_dict[in_node], Const):
-            raise TypeError("input node must be Const instance")
         self._nodes = node_dict
         self._adjacency = adjacency_dict
         self._in_node = node_dict[in_node]
@@ -135,10 +128,7 @@ class Filter():
             mul_node = self._nodes[name]
         except KeyError:
             raise KeyError('no node named %s' % name)
-        if not isinstance(mul_node, Multiply):
-            raise TypeError('node %s is not an instance of Multiply' % name)
-        else:
-            mul_node.set_factor(factor, norm)
+        mul_node.set_factor(factor, norm)
 
     def factors(self, norm=False):
         """Return names of the Multiply nodes with their factors."""

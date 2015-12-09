@@ -24,12 +24,8 @@ class _FilterNode():
     # public methods
     def connect(self, input_nodes):
         """Set the input nodes."""
-        if not isinstance(input_nodes, list):
-            raise TypeError("list of input nodes expected")
-        elif not len(input_nodes) == self._ninputs:
+        if not len(input_nodes) == self._ninputs:
             raise ValueError("number of input nodes must be %i" % self._ninputs)
-        elif not all([isinstance(x, _FilterNode) for x in input_nodes]):
-            raise TypeError("input nodes must be instance of _FilterNode")
         elif not all([node.bits() == self._bits for node in input_nodes]):
             raise ValueError("number of bits does not match")
         else:
