@@ -23,7 +23,6 @@ def _wrap(x, N):
     >>> [_wrap(x, 3) for x in range(-5, 5)]
     [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
 
-    >>> import numpy
     >>> list(_wrap(numpy.arange(-5, 5), 3))
     [3, -4, -3, -2, -1, 0, 1, 2, 3, -4]
     """
@@ -39,7 +38,6 @@ def _saturate(x, N):
     >>> [_saturate(x, 3) for x in range(-5, 5)]
     [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
 
-    >>> import numpy
     >>> list(_saturate(numpy.arange(-5, 5), 3))
     [-4, -4, -3, -2, -1, 0, 1, 2, 3, 3]
     """
@@ -54,7 +52,6 @@ def _test_overflow(x, N):
     >>> [int(_test_overflow(x, 3)) for x in range(-5, 5)]
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
 
-    >>> import numpy
     >>> map(int, _test_overflow(numpy.arange(-5, 5), 3))
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     """
