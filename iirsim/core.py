@@ -79,3 +79,18 @@ def from_real(x, N, M=0):
     """
     y = x * (2 ** (N - 1 - M))
     return _saturate(numpy.rint(y).astype(int), N)
+
+def to_real(x, N, M=0):
+    """
+    Map x from the range of N-bit two's complement numbers [-B, ..., B-1] to
+    the real interval [-r, r), where
+    B = 2 ** (N - 1),
+    r = 2 ** M (default: 1.0)
+
+    >>> [round(to_real(x, 8), 2) for x in [90, 100, 110, 120, 130]]
+    [0.7, 0.78, 0.86, 0.94, 1.02]
+
+    >>> [round(x, 2) for x in to_real(numpy.arange(48, 73, 4), 7)]
+    [0.75, 0.81, 0.88, 0.94, 1.0, 1.06, 1.13]
+    """
+    return x * (2 ** (-(N - 1) + M))
