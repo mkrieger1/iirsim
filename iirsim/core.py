@@ -60,30 +60,34 @@ def _test_overflow(x, N):
 
 def from_real(x, N, M=0):
     """
-    Map x from the real interval [-r, r) to the range of N-bit two's complement
-    numbers [-B, ..., B-1], rounding to the nearest possible value, where
+    Map x linearly from the real interval [-r, r) to the range of N-bit two's
+    complement numbers [-B, ..., B-1], rounding to the nearest possible value,
+    where
     r = 2 ** M (default: 1.0),
     B = 2 ** (N - 1).
 
+    Input values outside [-r, r) will be mapped to integers that cannot be
+    represented as an N-bit two's complement number.
+
     >>> [from_real(x, 8) for x in [0.7, 0.8, 0.9, 1.0, 1.1]]
-    [90, 102, 115, 127, 127]
+    [90, 102, 115, 128, 141]
 
     >>> list(from_real(numpy.linspace(0.6, 1.1, 10), 7))
-    [38, 42, 46, 49, 53, 56, 60, 63, 63, 63]
+    [38, 42, 46, 49, 53, 56, 60, 63, 67, 70]
 
     >>> list(from_real(numpy.linspace(0.3, 0.6, 10), 8, -1))
-    [77, 85, 94, 102, 111, 119, 127, 127, 127, 127]
+    [77, 85, 94, 102, 111, 119, 128, 137, 145, 154]
 
     >>> list(from_real(numpy.linspace(-4.5, -3.0, 10), 8, 2))
-    [-128, -128, -128, -128, -123, -117, -112, -107, -101, -96]
+    [-144, -139, -133, -128, -123, -117, -112, -107, -101, -96]
     """
     y = x * (2 ** (N - 1 - M))
-    return _saturate(numpy.rint(y).astype(int), N)
+    return numpy.rint(y).astype(int)
 
 def to_real(x, N, M=0):
     """
-    Map x from the range of N-bit two's complement numbers [-B, ..., B-1] to
-    the real interval [-r, r), where
+    Map x linearly from the range of N-bit two's complement numbers
+    [-B, ..., B-1] to the real interval [-r, r), where
     B = 2 ** (N - 1),
     r = 2 ** M (default: 1.0)
 
