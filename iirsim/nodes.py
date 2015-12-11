@@ -108,6 +108,25 @@ class Multiply(_FilterNode):
     def scale_bits(self):
         return self._factor_bits - self._norm_bits - 1
 
+    @property
+    def factor_norm(self):
+        """
+        Return the normalized factor as a real number.
+
+        >>> m = Multiply(8, 6, 5)
+        >>> m.set_factor(16)
+        >>> m.factor_norm
+        0.5
+        """
+        return self.factor(norm=True)
+
+    @factor_norm.setter
+    def factor_norm(self, value):
+        """
+        Set the factor from a normalized value.
+        """
+        self.set_factor(value, norm=True)
+
     def set_factor(self, factor, norm=False):
         """
         Set the factor to one of the possible values.
