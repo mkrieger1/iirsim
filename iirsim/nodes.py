@@ -1,5 +1,5 @@
 import math
-from core import _test_int, _test_overflow, _wrap
+from core import _test_int, _test_overflow, _wrap, from_real
 
 # base class: _FilterNode
 #--------------------------------------------------------------------
@@ -122,7 +122,7 @@ class Multiply(_FilterNode):
         ValueError: ...
         """
         if norm:
-            factor = int(round((1 << self._norm_bits)*factor))
+            factor = from_real(factor, self._factor_bits, self.scale_bits)
         if _test_overflow(factor, self._factor_bits):
             min_fact = -1 << self._factor_bits-1
             max_fact = (1 << self._factor_bits-1)-1
