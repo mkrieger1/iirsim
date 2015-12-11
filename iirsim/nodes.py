@@ -1,5 +1,5 @@
 import math
-from .core import _test_int, _test_overflow, _wrap
+from core import _test_int, _test_overflow, _wrap
 
 # base class: _FilterNode
 #--------------------------------------------------------------------

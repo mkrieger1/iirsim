@@ -1,4 +1,4 @@
-from .nodes import _FilterNode, Const, Multiply, Delay
+from nodes import _FilterNode, Const, Multiply, Delay
 
 class Filter():
     """This class makes a filter out of individual filter nodes."""
