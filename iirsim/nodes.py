@@ -1,5 +1,5 @@
 import math
-from core import _test_int, _test_overflow, _wrap, from_real
+from core import _test_int, _test_overflow, _wrap, from_real, to_real
 
 # base class: _FilterNode
 #--------------------------------------------------------------------
@@ -126,8 +126,8 @@ class Multiply(_FilterNode):
         if _test_overflow(factor, self._factor_bits):
             min_fact = -1 << self._factor_bits-1
             max_fact = (1 << self._factor_bits-1)-1
-            min_fact_sc = float(min_fact)/(1 << self._norm_bits)
-            max_fact_sc = float(max_fact)/(1 << self._norm_bits)
+            min_fact_sc = to_real(min_fact, self._factor_bits, self.scale_bits)
+            max_fact_sc = to_real(max_fact, self._factor_bits, self.scale_bits)
             raise ValueError( \
                 "factor must be in the range %i to %i (%.6f to %6f normalized)" \
                              % (min_fact, max_fact, min_fact_sc, max_fact_sc))
