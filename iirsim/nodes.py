@@ -104,6 +104,10 @@ class Multiply(_FilterNode):
 
         self.set_factor(factor)
 
+    @property
+    def scale_bits(self):
+        return self._factor_bits - self._norm_bits - 1
+
     def set_factor(self, factor, norm=False):
         """
         Set the factor to one of the possible values.
