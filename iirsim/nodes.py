@@ -105,7 +105,18 @@ class Multiply(_FilterNode):
         self.set_factor(factor)
 
     def set_factor(self, factor, norm=False):
-        """Set the factor."""
+        """
+        Set the factor to one of the possible values.
+
+        >>> m = Multiply(8, 6, 5)
+        >>> m.set_factor(0.5, norm=True)
+        >>> m.factor()
+        16
+        >>> m.set_factor(1.0, norm=True) # doctest: +IGNORE_EXCEPTION_DETAIL
+        Traceback (most recent call last):
+        ...
+        ValueError: ...
+        """
         if norm:
             factor = int(round((1 << self._norm_bits)*factor))
         if _test_overflow(factor, self._factor_bits):
