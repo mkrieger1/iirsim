@@ -124,8 +124,7 @@ class Multiply(_FilterNode):
         if norm:
             factor = from_real(factor, self._factor_bits, self.scale_bits)
         if _test_overflow(factor, self._factor_bits):
-            limit = 1 << (self._factor_bits - 1)
-            low, high = -limit, limit - 1
+            low, high = self.limits
             low_r, high_r = [to_real(x, self._factor_bits, self.scale_bits)
                              for x in [low, high]]
             raise ValueError( \
@@ -133,6 +132,12 @@ class Multiply(_FilterNode):
                              % (low, high, low_r, high_r))
         else:
             self._factor = factor
+
+    @property
+    def limits(self):
+        """Return the minimum and maximum possible factor."""
+        limit = 1 << (self._factor_bits - 1)
+        return -limit, limit - 1
 
     def set_factor_bits(self, factorbits, normbits):
         """Change the number of bits used for factor and factor norm."""
