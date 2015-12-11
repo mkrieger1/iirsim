@@ -124,13 +124,13 @@ class Multiply(_FilterNode):
         if norm:
             factor = from_real(factor, self._factor_bits, self.scale_bits)
         if _test_overflow(factor, self._factor_bits):
-            min_fact = -1 << self._factor_bits-1
-            max_fact = (1 << self._factor_bits-1)-1
-            min_fact_sc = to_real(min_fact, self._factor_bits, self.scale_bits)
-            max_fact_sc = to_real(max_fact, self._factor_bits, self.scale_bits)
+            limit = 1 << (self._factor_bits - 1)
+            low, high = -limit, limit - 1
+            low_r, high_r = [to_real(x, self._factor_bits, self.scale_bits)
+                             for x in [low, high]]
             raise ValueError( \
                 "factor must be in the range %i to %i (%.6f to %6f normalized)" \
-                             % (min_fact, max_fact, min_fact_sc, max_fact_sc))
+                             % (low, high, low_r, high_r))
         else:
             self._factor = factor
 
